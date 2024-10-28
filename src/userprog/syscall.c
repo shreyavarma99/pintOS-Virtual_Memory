@@ -30,11 +30,9 @@ void syscall_init (void)
 static void syscall_handler (struct intr_frame *f UNUSED)
 {
   /* Shreya Agrawal, Shreya Varma, Garv, Jyotsna driving */
-  for (int i = 0; i < 4; i++) 
-    {
-      /* check all 4 bytes of the pointer */
-      is_valid ((char *) f->esp + i);
-    }
+
+  /* check all 4 bytes of the pointer */
+  is_valid ((char *) f->esp);
 
   /* get arguments */
   int system_call = *(int *) f->esp;
@@ -248,8 +246,22 @@ int open (const char* file)
       /* file was not opened successfully */
       return -1;
     }
-  current->current_fd += 1;
-  current->files[current->current_fd] = currentFile;
+  if (current->current_fd == 127)
+  {
+    for (int i = 0; i < 128; i++)
+    {
+      if (current->files[i] == NULL)
+      {
+        current->files[i] = currentFile;
+        return current->current_fd;
+      }
+    }
+  }
+  else
+  {
+    current->current_fd += 1;
+    current->files[current->current_fd] = currentFile;
+  }
   return current->current_fd;
 }
 
@@ -498,6 +510,8 @@ void buf_valid (const void *buffer, unsigned size)
       is_valid ((void *) temporary_buffer);
       temporary_buffer += PGSIZE;
     }
+  
+  is_valid((void *) end_of_buffer);
 }
 
 /* 
@@ -514,7 +528,12 @@ void string_valid (const char* str)
     while (true)
       {
         /* Check if the current character pointer is valid */
-        is_valid ((void *) str);
+
+        if ((char *) str == NULL || !is_user_vaddr ((char *) str) ||
+        !pagedir_get_page (thread_current ()->pagedir, (char *) str))
+        {
+          exit (-1);
+        }
 
         /* If we reach the null terminator, stop the loop */
         if (*str == '\0')
