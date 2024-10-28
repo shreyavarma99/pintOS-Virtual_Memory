@@ -155,10 +155,10 @@ void exit (int status)
       sema_up (&temp->zombie);  
     }
   
+  list_remove (&current->child_elem);
   /* tell parent it is allowed to complete its wait */
   sema_up (&current->parent->wait);
 
-  list_remove (&current->child_elem);
   thread_exit ();
 }
 
