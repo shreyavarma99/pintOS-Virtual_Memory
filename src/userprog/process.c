@@ -531,64 +531,67 @@ static bool setup_stack (void **esp)
   if (kpage != NULL)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-      if (success)
+      if (success){
         *esp = PHYS_BASE;
-      else
+          
+        int maxArgs = 128;
+        char *arguments[maxArgs];
+        char *ptr;
+        char *argument = strtok_r ((char *) filename_copy, " ", &ptr);
+        int numArguments = 0;
+
+        while (argument != NULL)
+          {
+            /* add argument values to stack */
+            *esp = (char *) *esp - (strlen (argument) + 1);
+            if (numArguments > maxArgs)
+              {
+                process_exit ();
+              }
+            memcpy (*esp, argument, strlen (argument) + 1);
+
+            argument = strtok_r (NULL, " ", &ptr);
+
+            arguments[numArguments] = *esp;
+            numArguments++;
+          }
+
+        int currBytes = ((char *)PHYS_BASE - (char *)*esp);
+        int numBytesNeeded = currBytes % 4 == 0 ? 0 : (4 - currBytes % 4);
+        *esp = (char *) *esp - numBytesNeeded;
+        
+        /* add null sentinel */
+        *esp = (char *) *esp - sizeof(char *);
+        char *null_sentinel = NULL;
+        memcpy (*esp, &null_sentinel, sizeof(char *));
+
+        /* add argument pointers in reverse order */
+        for (int i = numArguments - 1; i >= 0; i--)
+          {
+            *esp = (char *) *esp - sizeof(char *);
+            memcpy (*esp, &arguments[i], sizeof(char *));
+          }
+
+        /* add pointer to array of arguments */
+        void* currESP = *esp;
+        *esp = (char *) *esp - sizeof(int);
+        memcpy (*esp, &currESP, sizeof(int));
+
+        /* add argument count */
+        *esp = (char *) *esp - sizeof(int);
+        memcpy (*esp, &numArguments, sizeof(int));
+
+        /* return fake dummy address */
+        *esp = (char *) *esp - sizeof(int);
+        int fakeAddress = 0;
+
+        memcpy (*esp, &fakeAddress, sizeof(int));
+    }
+    else {
         palloc_free_page (kpage);
     }
-
-  int maxArgs = 128;
-  char *arguments[maxArgs];
-  char *ptr;
-  char *argument = strtok_r ((char *) filename_copy, " ", &ptr);
-  int numArguments = 0;
-
-  while (argument != NULL)
-    {
-      /* add argument values to stack */
-      *esp = (char *) *esp - (strlen (argument) + 1);
-      if (numArguments > maxArgs)
-        {
-          process_exit ();
-        }
-      memcpy (*esp, argument, strlen (argument) + 1);
-
-      argument = strtok_r (NULL, " ", &ptr);
-
-      arguments[numArguments] = *esp;
-      numArguments++;
     }
 
-  int currBytes = ((char *)PHYS_BASE - (char *)*esp);
-  int numBytesNeeded = currBytes % 4 == 0 ? 0 : (4 - currBytes % 4);
-  *esp = (char *) *esp - numBytesNeeded;
-  
-  /* add null sentinel */
-  *esp = (char *) *esp - sizeof(char *);
-  char *null_sentinel = NULL;
-  memcpy (*esp, &null_sentinel, sizeof(char *));
-
-  /* add argument pointers in reverse order */
-  for (int i = numArguments - 1; i >= 0; i--)
-    {
-      *esp = (char *) *esp - sizeof(char *);
-      memcpy (*esp, &arguments[i], sizeof(char *));
-    }
-
-  /* add pointer to array of arguments */
-  void* currESP = *esp;
-  *esp = (char *) *esp - sizeof(int);
-  memcpy (*esp, &currESP, sizeof(int));
-
-  /* add argument count */
-  *esp = (char *) *esp - sizeof(int);
-  memcpy (*esp, &numArguments, sizeof(int));
-
-  /* return fake dummy address */
-  *esp = (char *) *esp - sizeof(int);
-  int fakeAddress = 0;
-
-  memcpy (*esp, &fakeAddress, sizeof(int));
   return success;
 }
 
