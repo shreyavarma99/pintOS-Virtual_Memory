@@ -35,12 +35,14 @@ tid_t process_execute (const char *file_name)
   tid_t tid;
 
   /* Make a copy of passed in command line. */
-  fn_copy = palloc_get_page (0);
+  fn_copy = allocate_frame ();
+  // fn_copy = palloc_get_page (0);
   char *ptr;
   if (fn_copy == NULL)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
-  filename_copy = palloc_get_page (0);
+  // filename_copy = palloc_get_page (0);
+  filename_copy = allocate_frame ();
   strlcpy (filename_copy, file_name, PGSIZE);
   executable = strtok_r (fn_copy, " ", &ptr);
 
@@ -478,7 +480,9 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
       /* Get a page of memory. */
-      uint8_t *kpage = palloc_get_page (PAL_USER);
+      // uint8_t *kpage = palloc_get_page (PAL_USER);
+      // PANIC("came into load_segment");
+      uint8_t *kpage = allocate_frame ();
       if (kpage == NULL)
         return false;
 
@@ -530,7 +534,8 @@ static bool setup_stack (void **esp)
 
   // instead, frame.c should be returning the right page
   // kpage = palloc_get_page (PAL_USER | PAL_ZERO);
-  kpage = allocate_frame ();
+  kpage = (uint8_t *) allocate_frame ();
+  // PANIC("done with alloc");
   if (kpage != NULL)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);

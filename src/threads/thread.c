@@ -94,8 +94,6 @@ void thread_init (void)
   list_init (&ready_list);
   list_init (&all_list);
 
-  init_frame_table (PAL_ZERO | PAL_USER);
-
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
   init_thread (initial_thread, "main", PRI_DEFAULT);

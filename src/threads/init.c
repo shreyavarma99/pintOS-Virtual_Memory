@@ -28,8 +28,11 @@
 #include "userprog/gdt.h"
 #include "userprog/syscall.h"
 #include "userprog/tss.h"
+#include "vm/frame.h"
 #else
 #include "tests/threads/tests.h"
+#endif
+#ifdef VM
 #endif
 #ifdef FILESYS
 #include "devices/block.h"
@@ -95,6 +98,7 @@ int main (void)
   palloc_init (user_page_limit);
   malloc_init ();
   paging_init ();
+  init_frame_table (PAL_ZERO | PAL_USER);
 
   /* Segmentation. */
 #ifdef USERPROG

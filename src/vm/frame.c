@@ -37,7 +37,7 @@ void init_frame_table (enum palloc_flags flagies)
 {
     lock_init(&frame_lock);
     // ASK
-    frames = malloc (user_pool_size * sizeof(struct frame_table_entry*));
+    frames = malloc (user_pool_size * sizeof(struct frame_table_entry));
     for (int i = 0; i < user_pool_size; i++)
     {
         /*
@@ -49,46 +49,52 @@ void init_frame_table (enum palloc_flags flagies)
                 frame = palloc_get_page(USER)
         */
         
-        frames[i].paddr = NULL;
-        if (flagies & PAL_USER)
-        {
-            if (flagies & PAL_ZERO) 
-            {
-                frames[i].paddr = palloc_get_page(PAL_USER | PAL_ZERO);
-            }
-            else 
-            {
-                frames[i].paddr = palloc_get_page(PAL_USER);
-            }
-        }
+        frames[i].paddr = palloc_get_page(PAL_USER | PAL_ZERO);
+        // if (flagies & PAL_USER)
+        // {
+        //     if (flagies & PAL_ZERO) 
+        //     {
+        //         frames[i].paddr = palloc_get_page(PAL_USER | PAL_ZERO);
+        //     }
+        //     else 
+        //     {
+        //         frames[i].paddr = palloc_get_page(PAL_USER);
+        //     }
+        // }
 
         /* If we do above then we do not need the line below right? */
         frames[i].vaddr = NULL;
         frames[i].owner = NULL; 
         frames[i].in_use = false;  
     }
+    // PANIC("got to end init frame table");
 }
 
 // add parameter of vaddr
 void *allocate_frame()
 {
+    // PANIC("beg of allocate frame");
     lock_acquire(&frame_lock);
     for (int i = 0; i < user_pool_size; i++)
     {
+        // PANIC("%d", user_pool_size);
         if (!frames[i].in_use)
         {
             frames[i].in_use = true;
             frames[i].owner = thread_current();
             // set pagedir[vaddr] = frams[i].paddr
             //add mapping
+            lock_release(&frame_lock);
+            // PANIC("found a free frame");
             return frames[i].paddr;
             
         }
 
     }
+    lock_release(&frame_lock);
     //eviction
     //found no free frames
-    PANIC("couldn't find a free frame");
+    // PANIC("couldn't find a free frame");
 }
 
 // bool add_map()
