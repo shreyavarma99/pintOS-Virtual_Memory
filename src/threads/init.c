@@ -98,7 +98,7 @@ int main (void)
   palloc_init (user_page_limit);
   malloc_init ();
   paging_init ();
-  init_frame_table (PAL_ZERO | PAL_USER);
+  init_frame_table ();
 
   /* Segmentation. */
 #ifdef USERPROG

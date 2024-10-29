@@ -14,6 +14,6 @@ struct frame_table_entry {
     bool in_use;
 };
 
-void init_frame_table (enum palloc_flags flagies);
+void init_frame_table ();
 void *allocate_frame();
 
