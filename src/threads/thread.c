@@ -200,6 +200,9 @@ tid_t thread_create (const char *name, int priority, thread_func *function,
   /* Add to run queue. */
   thread_unblock (t);
 
+  /* Add child and parent */
+  t->parent = thread_current ();
+  list_push_back (&t->parent->children, &t->child_elem);
   return tid;
 }
 
@@ -565,9 +568,10 @@ struct thread *get_thread (tid_t tid)
   /* Jyotsna driving */ 
   struct list_elem *e;
   struct thread* result = NULL;
-  for (e = list_begin (&all_list); e != list_end (&all_list); e = list_next (e))
+  struct thread* t = thread_current();
+  for (e = list_begin (&t->children); e != list_end (&t->children); e = list_next (e))
   {
-    struct thread *temp = list_entry (e, struct thread, allelem);
+    struct thread *temp = list_entry (e, struct thread, child_elem);
     if (temp->tid == tid)
     {
       result = temp;

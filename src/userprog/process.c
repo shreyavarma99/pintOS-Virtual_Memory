@@ -78,7 +78,7 @@ tid_t process_execute (const char *file_name)
   
   /* set parent of the child to current thread &
    wait until child has finished loading executable */
-  child->parent = thread_current ();
+  // child->parent = thread_current ();
   sema_down (&child->exec_load);
 
   if (!thread_current ()->child_loaded) 
@@ -87,7 +87,7 @@ tid_t process_execute (const char *file_name)
       return TID_ERROR;
     }
   child->executable = file_to_execute;
-  list_push_back (&child->parent->children, &child->child_elem);
+  //list_push_back (&child->parent->children, &child->child_elem);
   return tid;
 }
 
