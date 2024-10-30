@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <threads/synch.h>
+#include <hash.h>
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -114,9 +115,12 @@ struct thread
   struct semaphore zombie; /* semaphore to start exit */
   struct semaphore wait; /* semaphore to complete wait*/
   struct semaphore exec_load; /* semaphore for load */
-  bool child_loaded; /* success of loading executable */
+  bool loaded; /* success of loading executable */
   bool already_waited; /* indicates whether or not wait has been called */
   struct file *executable; /*file's executable*/
+#endif
+#ifdef VM
+   struct hash spt;
 #endif
 
   /* Owned by thread.c. */

@@ -444,7 +444,7 @@ static void init_thread (struct thread *t, const char *name, int priority)
   sema_init (&t->zombie, 0);
   sema_init (&t->exec_load, 0);
   t->current_fd = 1;
-  t->child_loaded = false;
+  t->loaded = false;
   t->already_waited = false;
   list_init (&t->children);
 

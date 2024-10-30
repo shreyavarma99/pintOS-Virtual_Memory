@@ -19,6 +19,7 @@
 #include "threads/vaddr.h"
 #include "threads/synch.h"
 #include "vm/frame.h"
+#include "syscall.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -47,7 +48,9 @@ tid_t process_execute (const char *file_name)
   executable = strtok_r (fn_copy, " ", &ptr);
 
   /* Jyotsna, Garv, and Shreya V. driving */
+  lock_acquire(&file_mutex);
   struct file *file_to_execute = filesys_open (executable);
+  lock_release(&file_mutex);
   if (file_to_execute == NULL) 
     {
       /* free allocated memory & return error if file open fails */
@@ -79,11 +82,13 @@ tid_t process_execute (const char *file_name)
   /* set parent of the child to current thread &
    wait until child has finished loading executable */
   // child->parent = thread_current ();
-  sema_down (&child->exec_load);
+  sema_down (&child->parent->exec_load);
 
-  if (!thread_current ()->child_loaded) 
+  if (!child->loaded) 
     {
       /* unsuccessful load */
+      list_remove(&child->child_elem);
+      sema_up(&child->zombie);
       return TID_ERROR;
     }
   child->executable = file_to_execute;
@@ -279,6 +284,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
    Returns true if successful, false otherwise. */
 bool load (const char *file_name, void (**eip) (void), void **esp)
 {
+  lock_acquire(&file_mutex);
   struct thread *t = thread_current ();
   struct Elf32_Ehdr ehdr;
   struct file *file = NULL;
@@ -386,15 +392,17 @@ done:
   /* track whether or not load was a success */
   if (success) 
     {
-      t->parent->child_loaded = true;
+      t->loaded = true;
+      // t->executable = file;
     } 
   else 
     {
-      t->parent->child_loaded = false;
+      t->loaded = false;
     }
   
   /* set execute know we have loaded successfully */
-  sema_up (&t->exec_load);
+  lock_release(&file_mutex);
+  sema_up (&t->parent->exec_load);
   file_close (file);
   palloc_free_page (filename_copy);
   return success;

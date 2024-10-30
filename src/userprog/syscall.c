@@ -171,10 +171,10 @@ pid_t exec (const char *cmd_line)
   /* validate command line */
   string_valid (cmd_line);
 
-  lock_acquire (&file_mutex);
+  // lock_acquire (&file_mutex);
   /* execute */
   tid_t result = process_execute (cmd_line);
-  lock_release (&file_mutex);
+  // lock_release (&file_mutex);
 
   return result;
 }
