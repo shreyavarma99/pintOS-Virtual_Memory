@@ -48,19 +48,19 @@ tid_t process_execute (const char *file_name)
   executable = strtok_r (fn_copy, " ", &ptr);
 
   /* Jyotsna, Garv, and Shreya V. driving */
-  lock_acquire(&file_mutex);
-  struct file *file_to_execute = filesys_open (executable);
-  lock_release(&file_mutex);
-  if (file_to_execute == NULL) 
-    {
-      /* free allocated memory & return error if file open fails */
-      palloc_free_page (fn_copy);
-      palloc_free_page (filename_copy);
-      return TID_ERROR;
-    }
+  // lock_acquire(&file_mutex);
+  // struct file *file_to_execute = filesys_open (executable);
+  // lock_release(&file_mutex);
+  // if (file_to_execute == NULL) 
+  //   {
+  //     /* free allocated memory & return error if file open fails */
+  //     palloc_free_page (fn_copy);
+  //     palloc_free_page (filename_copy);
+  //     return TID_ERROR;
+  //   }
 
   /* deny write to executable */
-  file_deny_write (file_to_execute);
+  // file_deny_write (file_to_execute);
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (executable, PRI_DEFAULT, start_process, fn_copy);
@@ -87,11 +87,12 @@ tid_t process_execute (const char *file_name)
   if (!child->loaded) 
     {
       /* unsuccessful load */
+      // PANIC("came into error case");
       list_remove(&child->child_elem);
       sema_up(&child->zombie);
       return TID_ERROR;
     }
-  child->executable = file_to_execute;
+  // child->executable = file_to_execute;
   //list_push_back (&child->parent->children, &child->child_elem);
   return tid;
 }
@@ -300,6 +301,7 @@ bool load (const char *file_name, void (**eip) (void), void **esp)
 
 
   file = filesys_open (executable);
+  t->executable = file;
 
   if (file == NULL)
     {
@@ -387,23 +389,28 @@ bool load (const char *file_name, void (**eip) (void), void **esp)
   
   success = true;
 
+// PANIC("%d", success);
 done:
   /* Shreya V. and Jyotsna driving */
   /* track whether or not load was a success */
   if (success) 
     {
       t->loaded = true;
+      file_deny_write(file);
+      // PANIC("%d", success);
       // t->executable = file;
     } 
   else 
     {
+      // PANIC("%d", success);
       t->loaded = false;
     }
   
+  // PANIC("%d", success);
   /* set execute know we have loaded successfully */
   lock_release(&file_mutex);
   sema_up (&t->parent->exec_load);
-  file_close (file);
+  // file_close (file);
   palloc_free_page (filename_copy);
   return success;
 }
