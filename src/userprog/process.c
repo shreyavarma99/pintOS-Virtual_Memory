@@ -64,7 +64,11 @@ tid_t process_execute (const char *file_name)
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (executable, PRI_DEFAULT, start_process, fn_copy);
-  
+  struct thread *child = get_thread (tid);
+  tid = child->tid;
+  // printf("this is the child tid before sema: %i\n", tid);
+  sema_down (&child->parent->exec_load);
+
   if (tid == TID_ERROR)
     {
       palloc_free_page (fn_copy);
@@ -73,7 +77,7 @@ tid_t process_execute (const char *file_name)
     }
 
   /* make sure thread creation was successful */
-  struct thread *child = get_thread (tid);
+  // sema_down (&child->parent->exec_load);
   if (child == NULL) 
     {
       return TID_ERROR;
@@ -82,18 +86,22 @@ tid_t process_execute (const char *file_name)
   /* set parent of the child to current thread &
    wait until child has finished loading executable */
   // child->parent = thread_current ();
-  sema_down (&child->parent->exec_load);
 
-  if (!child->loaded) 
-    {
-      /* unsuccessful load */
-      // PANIC("came into error case");
-      list_remove(&child->child_elem);
-      sema_up(&child->zombie);
-      return TID_ERROR;
-    }
+  // if (!child->loaded) 
+  //   {
+  //     /* unsuccessful load */
+  //     // PANIC("came into error case");
+  //     list_remove(&child->child_elem);
+  //     sema_up(&child->zombie);
+  //     return TID_ERROR;
+  //   }
   // child->executable = file_to_execute;
   //list_push_back (&child->parent->children, &child->child_elem);
+  // printf("%i", child->parent->tid);
+  if (child->tid_error)
+  {
+    return TID_ERROR;
+  }
   return tid;
 }
 
@@ -111,6 +119,22 @@ static void start_process (void *file_name_)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
+  struct thread *t = thread_current ();
+  t->loaded = success;
+
+  if (!success) 
+    {
+      /* unsuccessful load */
+      // PANIC("came into error case");
+      list_remove(&t->child_elem);
+      sema_up(&t->zombie);
+      t->tid = TID_ERROR;
+      t->tid_error = true;
+      // printf("%i", t->tid);
+      // return TID_ERROR;
+    }
+
+  sema_up (&t->parent->exec_load);
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
@@ -301,7 +325,6 @@ bool load (const char *file_name, void (**eip) (void), void **esp)
 
 
   file = filesys_open (executable);
-  t->executable = file;
 
   if (file == NULL)
     {
@@ -309,6 +332,8 @@ bool load (const char *file_name, void (**eip) (void), void **esp)
       goto done;
     }
 
+  t->executable = file;
+  file_deny_write(file);
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr ||
       memcmp (ehdr.e_ident, "\177ELF\1\1\1", 7) || ehdr.e_type != 2 ||
@@ -393,23 +418,23 @@ bool load (const char *file_name, void (**eip) (void), void **esp)
 done:
   /* Shreya V. and Jyotsna driving */
   /* track whether or not load was a success */
-  if (success) 
-    {
-      t->loaded = true;
-      file_deny_write(file);
-      // PANIC("%d", success);
-      // t->executable = file;
-    } 
-  else 
-    {
-      // PANIC("%d", success);
-      t->loaded = false;
-    }
+  // if (success) 
+  //   {
+  //     t->loaded = true;
+  //     // file_deny_write(file);
+  //     // PANIC("%d", success);
+  //     // t->executable = file;
+  //   } 
+  // else 
+  //   {
+  //     // PANIC("%d", success);
+  //     t->loaded = false;
+  //   }
   
   // PANIC("%d", success);
   /* set execute know we have loaded successfully */
   lock_release(&file_mutex);
-  sema_up (&t->parent->exec_load);
+  // sema_up (&t->parent->exec_load);
   // file_close (file);
   palloc_free_page (filename_copy);
   return success;

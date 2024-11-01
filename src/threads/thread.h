@@ -118,6 +118,7 @@ struct thread
   bool loaded; /* success of loading executable */
   bool already_waited; /* indicates whether or not wait has been called */
   struct file *executable; /*file's executable*/
+  bool tid_error;
 #endif
 #ifdef VM
    struct hash spt;

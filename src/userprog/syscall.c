@@ -125,7 +125,7 @@ void exit (int status)
   
   if (current->executable) 
     {
-      file_allow_write (current->executable);
+      // file_allow_write (current->executable);
       file_close (current->executable);
     }
   lock_release (&file_mutex);
