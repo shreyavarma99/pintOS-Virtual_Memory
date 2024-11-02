@@ -4,6 +4,8 @@
 #include "userprog/gdt.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "vm/page.h"
+#include "threads/vaddr.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -141,20 +143,29 @@ static void page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-  /* To implement virtual memory, delete the rest of the function
-     body, and replace it with code that brings in the page to
-     which fault_addr refers. */
-  if (fault_addr == NULL || !not_present) 
-   {
-      /* Garv driving*/
-      printf ("Page fault at %p: %s error %s page in %s context.\n", fault_addr,
-              not_present ? "not present" : "rights violation",
-              write ? "writing" : "reading", user ? "user" : "kernel");
+bool success = false;
+  //fault_addr is null
+  if (fault_addr != NULL && not_present && is_user_vaddr(fault_addr)) {
+   //PANIC("get into if statement");
+     struct spt_entry *found = page_lookup(fault_addr, thread_current ());
+     if (found)
+     {
+         if (found->in_file)
+         {
+            success = spt_handle_file_fault(found);
+         } else {
+            // swap situation
+         }
+     }
+     else 
+     {
+      // stack growth
+     }
+  }
 
-      exit (-1);
-   }
-
-  printf ("There is no crying in Pintos!\n");
-
-  kill (f);
+  if (!success)
+  {
+   PANIC("boutta kill");
+   kill (f);
+  }
 }

@@ -1,23 +1,14 @@
 /* imports */
-#include <stdio.h>
-#include <stdbool.h>
-#include <stdint.h>
-// #include "threads/tests.h"
-#include "threads/synch.h"
-#include "threads/palloc.h"
-#include <hash.h>
+#include "vm/frame.h"
 #include "lib/kernel/hash.h"
 #include "filesys/file.h"
-
-enum page_location{
-    FILE_BACKED,
-    SWAP,
-    ZERO_PAGE,
-};
+#include "threads/thread.h"
 
 struct spt_entry {
     struct thread *owner;
-    enum page_location location;//location of page: SWAP, DISK, or FILE backed
+    bool in_resident;
+    bool in_swap;
+    bool in_file;
     void *vaddr;
     struct file *file; /* file from which page was loaded */
     off_t offset; /* where in the file are we? */
@@ -26,3 +17,9 @@ struct spt_entry {
     struct hash_elem hash_elem;
     bool writable;
 };
+
+struct hash *spt_init (void);
+struct spt_entry *page_lookup (const void *address, struct thread *owner);
+bool suppl_hash_less (const struct hash_elem *a, const struct hash_elem *b, UNUSED void *aux);
+unsigned suppl_hash_hash (const struct hash_elem *e, UNUSED void *aux);
+bool spt_handle_file_fault(struct spt_entry *entry);

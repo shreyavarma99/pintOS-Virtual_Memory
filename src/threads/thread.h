@@ -121,7 +121,7 @@ struct thread
   bool tid_error;
 #endif
 #ifdef VM
-   struct hash spt;
+   struct hash *spt;
 #endif
 
   /* Owned by thread.c. */

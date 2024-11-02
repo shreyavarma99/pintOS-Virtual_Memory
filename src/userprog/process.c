@@ -322,6 +322,12 @@ bool load (const char *file_name, void (**eip) (void), void **esp)
   if (t->pagedir == NULL)
     goto done;
   process_activate ();
+    
+  thread_current()->spt = spt_init();
+  //PANIC("spt element count: %d", thread_current()->spt->elem_cnt);
+  if(thread_current()->spt == NULL){
+    PANIC("spt was null");
+  }
 
 
   file = filesys_open (executable);
