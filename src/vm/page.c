@@ -3,6 +3,8 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "userprog/pagedir.h"
+#include "filesys/file.h"
+#include <string.h>
 #include <stdio.h>
 
 struct hash *spt_init (void) {
@@ -10,7 +12,7 @@ struct hash *spt_init (void) {
     if (!spt) {
         return NULL;
     }
-    if(!hash_init (spt, &suppl_hash_hash, &suppl_hash_less, NULL))
+    if(!hash_init (spt, suppl_hash_hash, suppl_hash_less, NULL))
     {
       free(spt); 
       return NULL;
@@ -60,7 +62,7 @@ bool spt_handle_file_fault(struct spt_entry *entry){
     }
     entry->in_resident = true;
 
-    if (file_read(entry->file, kpage, entry->read_bytes) != (int) entry->read_bytes) {
+    if (file_read_at(entry->file, kpage, entry->read_bytes, entry->offset) != (int) entry->read_bytes) {
         palloc_free_page(kpage);
         printf("Failed to read file data into frame\n");
         return false;

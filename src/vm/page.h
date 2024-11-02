@@ -20,6 +20,6 @@ struct spt_entry {
 
 struct hash *spt_init (void);
 struct spt_entry *page_lookup (const void *address, struct thread *owner);
-bool suppl_hash_less (const struct hash_elem *a, const struct hash_elem *b, UNUSED void *aux);
-unsigned suppl_hash_hash (const struct hash_elem *e, UNUSED void *aux);
+hash_less_func suppl_hash_less;
+hash_hash_func suppl_hash_hash;
 bool spt_handle_file_fault(struct spt_entry *entry);

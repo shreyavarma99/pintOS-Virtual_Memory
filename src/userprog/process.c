@@ -14,12 +14,14 @@
 #include "threads/flags.h"
 #include "threads/init.h"
 #include "threads/interrupt.h"
+#include "threads/malloc.h"
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "threads/synch.h"
-#include "vm/frame.h"
+#include "vm/page.h"
 #include "syscall.h"
+#include "threads/thread.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -36,32 +38,17 @@ tid_t process_execute (const char *file_name)
   tid_t tid;
 
   /* Make a copy of passed in command line. */
-  fn_copy = allocate_frame (0);
-  // fn_copy = palloc_get_page (0);
+  fn_copy = palloc_get_page (0);
   char *ptr;
   if (fn_copy == NULL)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
-  // filename_copy = palloc_get_page (0);
-  filename_copy = allocate_frame (0);
+  filename_copy = palloc_get_page (0);
   strlcpy (filename_copy, file_name, PGSIZE);
   executable = strtok_r (fn_copy, " ", &ptr);
 
   /* Jyotsna, Garv, and Shreya V. driving */
-  // lock_acquire(&file_mutex);
-  // struct file *file_to_execute = filesys_open (executable);
-  // lock_release(&file_mutex);
-  // if (file_to_execute == NULL) 
-  //   {
-  //     /* free allocated memory & return error if file open fails */
-  //     palloc_free_page (fn_copy);
-  //     palloc_free_page (filename_copy);
-  //     return TID_ERROR;
-  //   }
-
-  /* deny write to executable */
-  // file_deny_write (file_to_execute);
-
+  
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (executable, PRI_DEFAULT, start_process, fn_copy);
   struct thread *child = get_thread (tid);
@@ -166,7 +153,6 @@ int process_wait (tid_t child_tid)
   struct thread* current = thread_current ();
   struct thread* child = NULL;
   struct list_elem *e;
-  struct thread* result = NULL;
   
   /* retrieve child of parent, NULL if it doesn't exist */
   for (e = list_begin (&current->children); 
@@ -322,13 +308,12 @@ bool load (const char *file_name, void (**eip) (void), void **esp)
   if (t->pagedir == NULL)
     goto done;
   process_activate ();
-    
+  
   thread_current()->spt = spt_init();
   //PANIC("spt element count: %d", thread_current()->spt->elem_cnt);
   if(thread_current()->spt == NULL){
     PANIC("spt was null");
   }
-
 
   file = filesys_open (executable);
 
@@ -424,24 +409,9 @@ bool load (const char *file_name, void (**eip) (void), void **esp)
 done:
   /* Shreya V. and Jyotsna driving */
   /* track whether or not load was a success */
-  // if (success) 
-  //   {
-  //     t->loaded = true;
-  //     // file_deny_write(file);
-  //     // PANIC("%d", success);
-  //     // t->executable = file;
-  //   } 
-  // else 
-  //   {
-  //     // PANIC("%d", success);
-  //     t->loaded = false;
-  //   }
-  
-  // PANIC("%d", success);
+
   /* set execute know we have loaded successfully */
   lock_release(&file_mutex);
-  // sema_up (&t->parent->exec_load);
-  // file_close (file);
   palloc_free_page (filename_copy);
   return success;
 }
@@ -525,32 +495,29 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-      /* Get a page of memory. */
-      // uint8_t *kpage = palloc_get_page (PAL_USER);
-      // PANIC("came into load_segment");
-      uint8_t *kpage = allocate_frame (PAL_USER);
-      if (kpage == NULL)
-        return false;
+      struct spt_entry *entry = malloc(sizeof(struct spt_entry));
+      entry->owner = thread_current();
+      entry->in_swap = false;
+      entry->in_file = true;
+      entry->vaddr = pg_round_down(upage);
+      entry->file = file;
+      entry->offset = ofs; /* where in the file are we? */
+      entry->zero_bytes = page_zero_bytes; /* number of bytes that are zeroed out */
+      entry->read_bytes = page_read_bytes; /* number of bytes that are read from file */
+      entry->writable = writable;
 
-      /* Load this page. */
-      if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
-        {
-          palloc_free_page (kpage);
-          return false;
-        }
-      memset (kpage + page_read_bytes, 0, page_zero_bytes);
-
-      /* Add the page to the process's address space. */
-      if (!install_page (upage, kpage, writable))
-        {
-          palloc_free_page (kpage);
-          return false;
-        }
+      // ASSERT(thread_current()->spt != NULL);
+      struct hash_elem *ret = hash_insert(thread_current()->spt, &entry->hash_elem);
+      if (ret == NULL) {
+        //PANIC("reinserting");
+      }
+      // PANIC("spt element count: %d", thread_current()->spt->elem_cnt);
 
       /* Advance. */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
       upage += PGSIZE;
+      ofs += page_read_bytes;
     }
   return true;
 }
@@ -584,7 +551,20 @@ static bool setup_stack (void **esp)
   // PANIC("done with alloc");
   if (kpage != NULL)
     {
-      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
+      struct spt_entry *stack_page = malloc(sizeof(struct spt_entry));
+      if (!stack_page) {
+        return false;
+      }
+      stack_page->owner = thread_current ();
+      stack_page->in_swap = true;
+      stack_page->in_file = false;
+      stack_page->in_resident = true;
+      stack_page->vaddr = ((uint8_t *) PHYS_BASE) - PGSIZE;
+      stack_page->writable = true;
+      ASSERT(&(stack_page->hash_elem) != NULL);
+      hash_insert(thread_current()->spt, &(stack_page->hash_elem));
+
+      success = install_page (stack_page->vaddr, kpage, true);
       if (success){
         *esp = PHYS_BASE;
           
