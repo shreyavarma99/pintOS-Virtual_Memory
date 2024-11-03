@@ -158,6 +158,7 @@ void exit (int status)
   sema_up (&current->parent->wait);
 
   thread_exit ();
+  
 }
 
 /**
@@ -275,6 +276,7 @@ int filesize (int fd)
   /* ensure fd is a valid number for file descriptor */
   if (fd <= 1 || fd >= 128) 
     {
+      PANIC("")
       exit (-1);
     }
     
@@ -508,6 +510,8 @@ void buf_valid (const void *buffer, unsigned size)
   while (temporary_buffer < end_of_buffer)
     {
       is_valid ((void *) temporary_buffer);
+      char val = *temporary_buffer;
+      val = val + 1;
       temporary_buffer += PGSIZE;
     }
   

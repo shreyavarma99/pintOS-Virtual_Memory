@@ -175,18 +175,18 @@ bool success = false;
       if ((char *) fault_addr < (char *) f->esp - 32) {
          success = false;
          exit(-1);
-      } else if (is_stack_growth(fault_addr, f->esp)){
+      } else 
+      if (is_stack_growth(fault_addr, f->esp))
+      {
          success = grow_that_stack(fault_addr);
       }
      }
-  }
+     return;
+   } else {
+      exit (-1);
+   }
 
-  if (!success)
-  {
-   //PANIC("boutta kill");
    kill (f);
-  }
-  return;
 }
 
 bool grow_that_stack(void * fault_addr)
