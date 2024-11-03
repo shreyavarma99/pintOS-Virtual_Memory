@@ -578,10 +578,10 @@ static bool setup_stack (void **esp)
           {
             /* add argument values to stack */
             *esp = (char *) *esp - (strlen (argument) + 1);
-            if (numArguments > maxArgs)
-              {
-                process_exit ();
-              }
+            // if (numArguments > maxArgs)
+            //   {
+            //     process_exit ();
+            //   }
             memcpy (*esp, argument, strlen (argument) + 1);
 
             argument = strtok_r (NULL, " ", &ptr);

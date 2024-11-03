@@ -3,12 +3,14 @@
 #include "lib/kernel/hash.h"
 #include "filesys/file.h"
 #include "threads/thread.h"
+#include <stdbool.h>
 
 struct spt_entry {
     struct thread *owner;
     bool in_resident;
     bool in_swap;
     bool in_file;
+    bool is_zero;
     void *vaddr;
     struct file *file; /* file from which page was loaded */
     off_t offset; /* where in the file are we? */
@@ -23,3 +25,4 @@ struct spt_entry *page_lookup (const void *address, struct thread *owner);
 hash_less_func suppl_hash_less;
 hash_hash_func suppl_hash_hash;
 bool spt_handle_file_fault(struct spt_entry *entry);
+bool add_new_spt_entry(struct hash *spt, struct spt_entry *new_entry);

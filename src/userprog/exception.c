@@ -6,6 +6,9 @@
 #include "threads/thread.h"
 #include "vm/page.h"
 #include "threads/vaddr.h"
+#include "threads/malloc.h"
+
+#define MAXIMUM_STACK_SIZE 8388608
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -104,6 +107,15 @@ static void kill (struct intr_frame *f)
     }
 }
 
+bool is_stack_growth(void *fault_addr, void *esp) 
+{
+   if(fault_addr >= ((char *) esp - 32) && ((char *) PHYS_BASE - (char *) pg_round_down (fault_addr) <= MAXIMUM_STACK_SIZE)){
+      return true;
+   }
+  return false;
+}
+
+
 /* Page fault handler.  This is a skeleton that must be filled in
    to implement virtual memory.  Some solutions to project 2 may
    also require modifying this code.
@@ -159,13 +171,60 @@ bool success = false;
      }
      else 
      {
-      // stack growth
+      // invalid stack growth
+      if ((char *) fault_addr < (char *) f->esp - 32) {
+         success = false;
+         exit(-1);
+      } else if (is_stack_growth(fault_addr, f->esp)){
+         success = grow_that_stack(fault_addr);
+      }
      }
   }
 
   if (!success)
   {
-   PANIC("boutta kill");
+   //PANIC("boutta kill");
    kill (f);
   }
+  return;
+}
+
+bool grow_that_stack(void * fault_addr)
+{
+   void *upage = pg_round_down(fault_addr);
+
+   struct spt_entry *temp_entry = malloc(sizeof(struct spt_entry));
+   
+   temp_entry->in_resident = true;
+   temp_entry->owner = thread_current();
+   temp_entry->is_zero = true; // TO DO need stack enum?
+   temp_entry->writable = true;
+   temp_entry->vaddr = upage;
+
+   // allocate the frame
+   uintptr_t *kpage = allocate_frame(PAL_USER, upage);
+   if(!kpage){
+      PANIC("couldn't allocate frame for stack growth :(");
+      return false;
+   }
+
+   // add to spt
+   if(!add_new_spt_entry(thread_current()->spt, temp_entry)){
+      free(temp_entry);
+      //PANIC("couldn't add new entry to spt :(");
+      return false;
+   }
+   
+   // add to pagedir
+   if(!pagedir_get_page (thread_current()->pagedir, upage) == NULL ||
+          !pagedir_set_page (thread_current()->pagedir, temp_entry->vaddr, kpage, temp_entry->writable)){
+            return false;
+   }
+
+          
+   //bool error = install_page (temp_entry->vaddr, kpage, temp_entry->writable);
+   // if(!error){
+   //    PANIC("couldn't add mapping to pagedir");
+   //    return false;
+   // }
 }

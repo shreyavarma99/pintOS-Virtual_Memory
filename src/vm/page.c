@@ -84,3 +84,12 @@ bool spt_handle_file_fault(struct spt_entry *entry){
     }
     return true;
 }
+
+
+bool add_new_spt_entry(struct hash *spt, struct spt_entry *new_entry)
+{
+    if(!hash_insert(spt, &new_entry->hash_elem)){
+        return true;
+    }
+    return false;
+}
