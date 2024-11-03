@@ -35,7 +35,7 @@ void swap_into_disk (struct spt_entry *entry)
     for (int i = 0; i < 8; i++)
     {
         block_write(swap, swap_index * 8 + i, 
-                pagedir_get_page(entry->owner->pagedir, entry->vaddr) + i * 512);
+                (char *) pagedir_get_page(entry->owner->pagedir, entry->vaddr) + i * 512);
     }
 
 }
@@ -49,7 +49,7 @@ void swap_out_of_disk(struct spt_entry *entry)
     for (int i = 0; i < 8; i++)
     {
         block_read(swap, swap_index * 8 + i, 
-            pagedir_get_page(entry->owner->pagedir, entry->vaddr) + i * 512);
+            (char *) pagedir_get_page(entry->owner->pagedir, entry->vaddr) + i * 512);
     }
     bitmap_reset (swap_partition, swap_index);
     entry->swap_index = -1;

@@ -1,5 +1,4 @@
 /* imports */
-#include "vm/frame.h"
 #include "lib/kernel/hash.h"
 #include "filesys/file.h"
 #include "threads/thread.h"

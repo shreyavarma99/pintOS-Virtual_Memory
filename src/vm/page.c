@@ -4,6 +4,7 @@
 #include "threads/vaddr.h"
 #include "userprog/pagedir.h"
 #include "filesys/file.h"
+#include "frame.h"
 #include <string.h>
 #include <stdio.h>
 

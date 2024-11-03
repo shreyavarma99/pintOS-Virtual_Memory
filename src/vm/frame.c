@@ -3,7 +3,10 @@
 #include "threads/palloc.h" 
 #include "threads/malloc.h"
 #include "threads/vaddr.h"
-
+#include "threads/thread.h"
+#include "userprog/pagedir.h"
+#include "vm/swap.h"
+#include <string.h>
  
 /*
     functions that we may... possibly need:
@@ -33,6 +36,7 @@
 
 struct lock frame_lock; /* Lock for frames */
 struct frame_table_entry *frames; 
+uint8_t clock;
 
 void init_frame_table ()
 {
@@ -59,7 +63,23 @@ void *allocate_frame(enum palloc_flags flagies, void *upage)
     else 
         {
             // eviction
-            PANIC("couldn't find a free frame");
+            struct frame_table_entry *frame_to_replace = evict_frame();
+            struct spt_entry *page_from_swap = page_lookup(pg_round_down(upage), thread_current());
+            if (page_from_swap && page_from_swap->swap_index != -1)
+            {
+                // in swap
+                swap_out_of_disk(page_from_swap);
+            } else if (page_from_swap->in_file) {
+                // from a file
+                off_t read_bytes = file_read_at(page_from_swap->file, frame_to_replace->paddr, 
+                    page_from_swap->read_bytes, page_from_swap->offset);
+                memset(frame_to_replace->paddr + read_bytes, 0, PGSIZE - read_bytes);
+            } else {
+                // zero page
+                memset(frame_to_replace->paddr, 0, PGSIZE);
+            }     
+            // PANIC("couldn't find a free frame");
+            return frame_to_replace->paddr;
         }
 }
 
@@ -72,4 +92,40 @@ void free_frame(void *kpage)
     frames[index].owner = NULL;
     frames[index].paddr = NULL;
     lock_release(&frame_lock);
+}
+
+struct frame_table_entry *evict_frame(void)
+{
+    while(true)
+    {
+        // reached end of frame table
+        if (clock >= user_pool_size) {
+            clock = 0;
+        }
+        
+        struct frame_table_entry *frame = &frames[clock];
+        if(frame->in_use){
+            struct thread *owner = frame->owner;
+            if(owner)
+            {
+                if(pagedir_is_accessed (owner->pagedir, frame->vaddr))
+                {
+                    //frame was accessed
+                    pagedir_set_accessed(owner->pagedir, frame->vaddr, false);
+                }
+                else{
+                    //frame was not accessed...evict frame
+                    bool dirty = pagedir_is_dirty(owner->pagedir, frame->vaddr);
+                    pagedir_clear_page(owner->pagedir, frame->vaddr);
+                    struct spt_entry *entry = page_lookup(frame->vaddr, owner);
+                    entry->in_swap = true;
+                    swap_into_disk(entry);
+                    frame->in_use = false;
+                    frame->owner = NULL;
+                    frame->vaddr = NULL;
+                    return frame;
+                }
+            }
+        }
+    }
 }

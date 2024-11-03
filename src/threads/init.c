@@ -29,6 +29,7 @@
 #include "userprog/syscall.h"
 #include "userprog/tss.h"
 #include "vm/frame.h"
+#include "vm/swap.h"
 #else
 #include "tests/threads/tests.h"
 #endif
@@ -99,6 +100,7 @@ int main (void)
   malloc_init ();
   paging_init ();
   init_frame_table ();
+  
 
   /* Segmentation. */
 #ifdef USERPROG
@@ -127,7 +129,7 @@ int main (void)
   locate_block_devices ();
   filesys_init (format_filesys);
 #endif
-
+  swap_init();
   printf ("Boot complete.\n");
 
   /* Run actions specified on kernel command line. */

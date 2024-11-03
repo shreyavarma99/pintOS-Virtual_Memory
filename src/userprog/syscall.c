@@ -276,7 +276,6 @@ int filesize (int fd)
   /* ensure fd is a valid number for file descriptor */
   if (fd <= 1 || fd >= 128) 
     {
-      PANIC("")
       exit (-1);
     }
     

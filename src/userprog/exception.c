@@ -7,6 +7,7 @@
 #include "vm/page.h"
 #include "threads/vaddr.h"
 #include "threads/malloc.h"
+#include "vm/frame.h"
 
 #define MAXIMUM_STACK_SIZE 8388608
 
@@ -181,7 +182,11 @@ bool success = false;
          success = grow_that_stack(fault_addr);
       }
      }
-     return;
+     if (success)
+     {
+       return;
+     }
+     exit(-1);
    } else {
       exit (-1);
    }
