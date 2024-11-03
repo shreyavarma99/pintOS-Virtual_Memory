@@ -24,5 +24,6 @@ struct hash *spt_init (void);
 struct spt_entry *page_lookup (const void *address, struct thread *owner);
 hash_less_func suppl_hash_less;
 hash_hash_func suppl_hash_hash;
+hash_action_func destruct;
 bool spt_handle_file_fault(struct spt_entry *entry);
 bool add_new_spt_entry(struct hash *spt, struct spt_entry *new_entry);

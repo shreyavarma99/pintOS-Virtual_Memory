@@ -186,7 +186,8 @@ void process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
-
+  
+  destroy_table();
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
@@ -547,7 +548,7 @@ static bool setup_stack (void **esp)
 
   // instead, frame.c should be returning the right page
   // kpage = palloc_get_page (PAL_USER | PAL_ZERO);
-  kpage = (uint8_t *) allocate_frame (PAL_USER | PAL_ZERO);
+  kpage = (uint8_t *) allocate_frame (PAL_USER | PAL_ZERO, ((uint8_t *) PHYS_BASE) - PGSIZE);
   // PANIC("done with alloc");
   if (kpage != NULL)
     {
@@ -578,10 +579,6 @@ static bool setup_stack (void **esp)
           {
             /* add argument values to stack */
             *esp = (char *) *esp - (strlen (argument) + 1);
-            // if (numArguments > maxArgs)
-            //   {
-            //     process_exit ();
-            //   }
             memcpy (*esp, argument, strlen (argument) + 1);
 
             argument = strtok_r (NULL, " ", &ptr);

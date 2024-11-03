@@ -8,12 +8,13 @@
 
 
 struct frame_table_entry {
-    uintptr_t paddr; /* physical address of frame */ 
+    uint8_t *paddr; /* physical address of frame */ 
     void *vaddr; /* virtual address TODO also include spte */ 
     struct thread *owner;
     bool in_use;
 };
 
 void init_frame_table ();
-void *allocate_frame();
+void *allocate_frame(enum palloc_flags flagies, void *upage);
+void free_frame(void *kpage);
 

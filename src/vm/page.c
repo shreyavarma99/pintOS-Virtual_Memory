@@ -23,6 +23,22 @@ struct hash *spt_init (void) {
     return spt;
 }
 
+//overridden hash action function for destruction
+void destruct(struct hash_elem *e, void *aux UNUSED)
+{
+    struct spt_entry *entry;
+    entry = hash_entry(e, struct spt_entry, hash_elem);
+    // free frame this entry occupies
+    if (entry->in_resident)
+        free_frame(pagedir_get_page(thread_current ()->pagedir, entry->vaddr));
+    free(entry);
+}
+
+void destroy_table()
+{
+    hash_destroy(thread_current ()->spt, destruct);
+}
+
 /* Compares the value of two hash elements A and B, given
    auxiliary data AUX.  Returns true if A is less than B, or
    false if A is greater than or equal to B. */
@@ -55,7 +71,7 @@ struct spt_entry *page_lookup (const void *address, struct thread *owner)
 }
 
 bool spt_handle_file_fault(struct spt_entry *entry){
- uint8_t *kpage = allocate_frame(PAL_USER);
+ uint8_t *kpage = allocate_frame(PAL_USER, entry->vaddr);
     if (kpage == NULL) {
         printf("Failed to allocate frame\n");
         return false;
