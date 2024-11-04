@@ -127,5 +127,6 @@ struct frame_table_entry *evict_frame(void)
                 }
             }
         }
+        clock++;
     }
 }

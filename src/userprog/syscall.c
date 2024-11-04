@@ -10,6 +10,7 @@
 #include "devices/shutdown.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
+#include "vm/page.h"
 
 static void syscall_handler (struct intr_frame *);
 void is_valid (void *uaddr);
@@ -491,6 +492,10 @@ void is_valid (void *uaddr)
         {
           exit (-1);
         }
+      if (page_lookup((char *) uaddr + j, thread_current())) {
+          char val = * ( (char *) uaddr + j);
+          val = val + 1;
+      }
     }
 }
 
@@ -508,7 +513,19 @@ void buf_valid (const void *buffer, unsigned size)
   /* check byte on each page for validity */
   while (temporary_buffer < end_of_buffer)
     {
-      is_valid ((void *) temporary_buffer);
+      //is_valid ((void *) temporary_buffer);
+      for (int j = 0; j < 4; j++) 
+      {
+        /* check all three conditions for that byte */
+        if ((char *) temporary_buffer + j == NULL || !is_user_vaddr ((char *) temporary_buffer + j))
+          {
+            exit (-1);
+          }
+        if (page_lookup(temporary_buffer + j, thread_current())) {
+          char val = *(temporary_buffer + j);
+          val = val + 1;
+        }
+      }
       char val = *temporary_buffer;
       val = val + 1;
       temporary_buffer += PGSIZE;
