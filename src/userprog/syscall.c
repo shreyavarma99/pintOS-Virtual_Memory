@@ -334,6 +334,7 @@ int read (int fd, void *buffer, unsigned size)
       /* read from file */
       lock_acquire (&file_mutex);
       int result = file_read (current->files[fd], buffer, size);
+     // PANIC("finished read");
       lock_release (&file_mutex);
       return result;
     }
@@ -487,15 +488,10 @@ void is_valid (void *uaddr)
   for (int j = 0; j < 4; j++) 
     {
       /* check all three conditions for that byte */
-      if ((char *) uaddr + j == NULL || !is_user_vaddr ((char *) uaddr + j) ||
-        !pagedir_get_page (thread_current ()->pagedir, (char *) uaddr + j))
+      if ((char *) uaddr + j == NULL || !is_user_vaddr ((char *) uaddr + j) || !pagedir_get_page (thread_current ()->pagedir, (char *) uaddr + j))
         {
           exit (-1);
         }
-      if (page_lookup((char *) uaddr + j, thread_current())) {
-          char val = * ( (char *) uaddr + j);
-          val = val + 1;
-      }
     }
 }
 
@@ -524,14 +520,34 @@ void buf_valid (const void *buffer, unsigned size)
         if (page_lookup(temporary_buffer + j, thread_current())) {
           char val = *(temporary_buffer + j);
           val = val + 1;
+          // struct spt_entry *found = page_lookup(temporary_buffer, thread_current ());
+          // if(!spt_handle_file_fault(found)){
+          //   PANIC("couldn't handle file fault correctly");
+          // }
+        }
+        else
+        {
+          exit(-1);
         }
       }
-      char val = *temporary_buffer;
-      val = val + 1;
+      // char val = *temporary_buffer;
+      // val = val + 1;
       temporary_buffer += PGSIZE;
     }
   
-  is_valid((void *) end_of_buffer);
+  for (int j = 0; j < 4; j++) 
+      {
+        /* check all three conditions for that byte */
+        if ((char *) end_of_buffer + j == NULL || !is_user_vaddr ((char *) end_of_buffer + j))
+          {
+            exit (-1);
+          }
+        if (page_lookup(end_of_buffer + j, thread_current())) {
+          char val = *(end_of_buffer + j);
+          val = val + 1;
+        }
+      }
+  // is_valid((void *) end_of_buffer);
 }
 
 /* 
