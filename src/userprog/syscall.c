@@ -332,6 +332,11 @@ int read (int fd, void *buffer, unsigned size)
   else 
     {
       /* read from file */
+      // void *buffer_page = pagedir_get_page(thread_current()->pgdir, buffer);
+      struct spt_entry *buffer_spt_entry = page_lookup(buffer, thread_current());
+      if(!buffer_spt_entry->writable){
+        exit(-1);
+      }
       lock_acquire (&file_mutex);
       int result = file_read (current->files[fd], buffer, size);
      // PANIC("finished read");
@@ -495,21 +500,22 @@ void is_valid (void *uaddr)
     }
 }
 
-/**
- * Check if a buffer contains valid addresses
- * Takes in the buffer and the size we want to check
- * and checks if the buffer is valid by iterating by PGSIZE 
- */
+// /**
+//  * Check if a buffer contains valid addresses
+//  * Takes in the buffer and the size we want to check
+//  * and checks if the buffer is valid by iterating by PGSIZE 
+//  */
+
 void buf_valid (const void *buffer, unsigned size) 
 {
   /* Garv and Shreya V. driving */
   char *temporary_buffer = (char *) buffer;
   char *end_of_buffer = temporary_buffer + size;
+  struct spt_entry *found;
 
   /* check byte on each page for validity */
   while (temporary_buffer < end_of_buffer)
     {
-      //is_valid ((void *) temporary_buffer);
       for (int j = 0; j < 4; j++) 
       {
         /* check all three conditions for that byte */
@@ -517,16 +523,18 @@ void buf_valid (const void *buffer, unsigned size)
           {
             exit (-1);
           }
-        if (page_lookup(temporary_buffer + j, thread_current())) {
-          char val = *(temporary_buffer + j);
-          val = val + 1;
-          // struct spt_entry *found = page_lookup(temporary_buffer, thread_current ());
-          // if(!spt_handle_file_fault(found)){
-          //   PANIC("couldn't handle file fault correctly");
-          // }
-        }
-        else
-        {
+        found = page_lookup(temporary_buffer + j, thread_current ());
+        if (found) {
+          if (!found->in_resident)
+          {
+            bool res = spt_handle_file_fault(found);
+            if (!res)
+            {
+              exit(-1);
+            }
+          }
+        } else {
+          // if not loaded in as a page, page lookup 
           exit(-1);
         }
       }
@@ -542,13 +550,24 @@ void buf_valid (const void *buffer, unsigned size)
           {
             exit (-1);
           }
-        if (page_lookup(end_of_buffer + j, thread_current())) {
-          char val = *(end_of_buffer + j);
-          val = val + 1;
+        found = page_lookup(end_of_buffer + j, thread_current ());
+        if (found) {
+          if (!found->in_resident)
+          {
+            bool res = spt_handle_file_fault(found);
+            if (!res)
+            {
+              exit(-1);
+            }
+          }
+        } else {
+          // if not loaded in as a page, page lookup 
+          exit(-1);
         }
       }
   // is_valid((void *) end_of_buffer);
 }
+
 
 /* 
  * Check if a given string is valid.

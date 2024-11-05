@@ -507,7 +507,9 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
       entry->read_bytes = page_read_bytes; /* number of bytes that are read from file */
       entry->writable = writable;
 
-      // ASSERT(thread_current()->spt != NULL);
+       if(!is_user_vaddr(entry->vaddr)){
+        PANIC("trying to add smtg that isn't user mem in load");
+    }
       struct hash_elem *ret = hash_insert(thread_current()->spt, &entry->hash_elem);
       if (ret == NULL) {
         //PANIC("reinserting");
@@ -563,6 +565,9 @@ static bool setup_stack (void **esp)
       stack_page->vaddr = ((uint8_t *) PHYS_BASE) - PGSIZE;
       stack_page->writable = true;
       ASSERT(&(stack_page->hash_elem) != NULL);
+       if(!is_user_vaddr(stack_page->vaddr)){
+        PANIC("trying to add smtg that isn't user mem");
+    }
       hash_insert(thread_current()->spt, &(stack_page->hash_elem));
 
       success = install_page (stack_page->vaddr, kpage, true);

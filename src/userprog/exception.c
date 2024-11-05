@@ -158,8 +158,7 @@ static void page_fault (struct intr_frame *f)
 
 bool success = false;
   //fault_addr is null
-  if (fault_addr != NULL && not_present && is_user_vaddr(fault_addr)) {
-   //PANIC("get into if statement");
+  if (fault_addr != NULL && not_present && is_user_vaddr(fault_addr)) { //&& not present
      struct spt_entry *found = page_lookup(fault_addr, thread_current ());
      if (found)
      {
@@ -172,21 +171,21 @@ bool success = false;
      }
      else 
      {
-      // invalid stack growth
-      if ((char *) fault_addr < (char *) f->esp - 32) {
-         success = false;
-         exit(-1);
-      } else 
       if (is_stack_growth(fault_addr, f->esp))
       {
          success = grow_that_stack(fault_addr);
+      }
+      else{
+         //invalid stack growth
+        // PANIC("invalid stack growth");
+         success = false;
+         exit(-1);
       }
      }
      if (success)
      {
        return;
      }
-     exit(-1);
    } else {
       exit (-1);
    }

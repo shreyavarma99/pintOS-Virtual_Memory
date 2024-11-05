@@ -29,6 +29,12 @@ void destruct(struct hash_elem *e, void *aux UNUSED)
 {
     struct spt_entry *entry;
     entry = hash_entry(e, struct spt_entry, hash_elem);
+    // if(entry == NULL){
+      //  PANIC("owner tid: %d", entry->owner->tid);
+    // }
+    if(!is_user_vaddr(entry->vaddr)){
+        PANIC("failed the user vadder thingy");
+    }
     // free frame this entry occupies
     if (entry->in_resident)
         free_frame(pagedir_get_page(thread_current ()->pagedir, entry->vaddr));
@@ -37,6 +43,9 @@ void destruct(struct hash_elem *e, void *aux UNUSED)
 
 void destroy_table()
 {
+
+    // PANIC("%d", thread_current()->spt->elem_cnt);
+    ///PANIC(thread_current()->spt->elem_cnt);
     hash_destroy(thread_current ()->spt, destruct);
 }
 
@@ -105,6 +114,10 @@ bool spt_handle_file_fault(struct spt_entry *entry){
 
 bool add_new_spt_entry(struct hash *spt, struct spt_entry *new_entry)
 {
+    if(!is_user_vaddr(new_entry->vaddr)){
+        PANIC("trying to add smtg that isn't user mem");
+    }
+    
     if(!hash_insert(spt, &new_entry->hash_elem)){
         return true;
     }
