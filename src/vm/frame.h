@@ -10,6 +10,7 @@ struct frame_table_entry {
     void *vaddr; /* virtual address TODO also include spte */ 
     struct thread *owner;
     bool in_use;
+    struct lock lock;
 };
 
 void init_frame_table (void);

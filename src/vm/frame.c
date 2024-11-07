@@ -62,24 +62,25 @@ void *allocate_frame(enum palloc_flags flagies, void *upage)
         } 
     else 
         {
-            // eviction
-            struct frame_table_entry *frame_to_replace = evict_frame();
-            struct spt_entry *page_from_swap = page_lookup(pg_round_down(upage), thread_current());
-            if (page_from_swap && page_from_swap->swap_index != -1)
-            {
-                // in swap
-                swap_out_of_disk(page_from_swap);
-            } else if (page_from_swap->in_file) {
-                // from a file
-                off_t read_bytes = file_read_at(page_from_swap->file, frame_to_replace->paddr, 
-                    page_from_swap->read_bytes, page_from_swap->offset);
-                memset(frame_to_replace->paddr + read_bytes, 0, PGSIZE - read_bytes);
-            } else {
-                // zero page
-                memset(frame_to_replace->paddr, 0, PGSIZE);
-            }     
-            //PANIC("couldn't find a free frame");
-             return frame_to_replace->paddr;
+            PANIC("no more frames");
+            // // eviction
+            // struct frame_table_entry *frame_to_replace = evict_frame();
+            // struct spt_entry *page_from_swap = page_lookup(pg_round_down(upage), thread_current());
+            // if (page_from_swap && page_from_swap->swap_index != -1)
+            // {
+            //     // in swap
+            //     swap_out_of_disk(page_from_swap);
+            // } else if (page_from_swap->in_file) {
+            //     // from a file
+            //     off_t read_bytes = file_read_at(page_from_swap->file, frame_to_replace->paddr, 
+            //         page_from_swap->read_bytes, page_from_swap->offset);
+            //     memset(frame_to_replace->paddr + read_bytes, 0, PGSIZE - read_bytes);
+            // } else {
+            //     // zero page
+            //     memset(frame_to_replace->paddr, 0, PGSIZE);
+            // }     
+            // //PANIC("couldn't find a free frame");
+            //  return frame_to_replace->paddr;
         }
 }
 
