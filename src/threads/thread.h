@@ -122,6 +122,7 @@ struct thread
 #endif
 #ifdef VM
    struct hash *spt;
+   void *esp; /* stack pointer */
 #endif
 
   /* Owned by thread.c. */

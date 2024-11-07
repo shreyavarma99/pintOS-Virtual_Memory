@@ -171,13 +171,13 @@ bool success = false;
      }
      else 
      {
-      if (is_stack_growth(fault_addr, f->esp))
+      void *correct_esp = thread_current()->esp != NULL ? thread_current()->esp : f->esp;
+      if (is_stack_growth(fault_addr, correct_esp))
       {
          success = grow_that_stack(fault_addr);
       }
       else{
          //invalid stack growth
-        // PANIC("invalid stack growth");
          success = false;
          exit(-1);
       }

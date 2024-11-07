@@ -11,6 +11,7 @@
 #include "filesys/file.h"
 #include "filesys/filesys.h"
 #include "vm/page.h"
+#include "userprog/exception.h"
 
 static void syscall_handler (struct intr_frame *);
 void is_valid (void *uaddr);
@@ -21,6 +22,8 @@ struct lock file_mutex;
 unsigned tell (int fd);
 void buf_valid (const void *buffer, unsigned size);
 void string_valid (const char* str);
+
+#define MAXIMUM_STACK_SIZE 8388608
 
 void syscall_init (void)
 {
@@ -33,6 +36,7 @@ static void syscall_handler (struct intr_frame *f UNUSED)
   /* Shreya Agrawal, Shreya Varma, Garv, Jyotsna driving */
 
   /* check all 4 bytes of the pointer */
+  thread_current()->esp = f->esp;
   is_valid ((char *) f->esp);
 
   /* get arguments */
@@ -99,6 +103,7 @@ static void syscall_handler (struct intr_frame *f UNUSED)
       default:
         break;
     }
+  thread_current()->esp = NULL;
 }
 
 /**
@@ -510,7 +515,7 @@ void buf_valid (const void *buffer, unsigned size)
 {
   /* Garv and Shreya V. driving */
   char *temporary_buffer = (char *) buffer;
-  char *end_of_buffer = temporary_buffer + size;
+  char *end_of_buffer = temporary_buffer + size - 1;
   struct spt_entry *found;
 
   /* check byte on each page for validity */
@@ -534,8 +539,16 @@ void buf_valid (const void *buffer, unsigned size)
             }
           }
         } else {
+          bool success = false;
           // if not loaded in as a page, page lookup 
-          exit(-1);
+          if(temporary_buffer + j >= ((char *) thread_current()->esp - 32) && 
+              ((char *) PHYS_BASE - (char *) pg_round_down (temporary_buffer + j) <= MAXIMUM_STACK_SIZE)){
+                success = grow_that_stack(temporary_buffer + j);
+          }
+          if (!success)
+          {
+            exit(-1);
+          }
         }
       }
       // char val = *temporary_buffer;
@@ -561,8 +574,16 @@ void buf_valid (const void *buffer, unsigned size)
             }
           }
         } else {
+          bool success = false;
           // if not loaded in as a page, page lookup 
-          exit(-1);
+          if(temporary_buffer + j >= ((char *) thread_current()->esp - 32) && 
+              ((char *) PHYS_BASE - (char *) pg_round_down (temporary_buffer + j) <= MAXIMUM_STACK_SIZE)){
+                success = grow_that_stack(temporary_buffer + j);
+          }
+          if (!success)
+          {
+            exit(-1);
+          }
         }
       }
   // is_valid((void *) end_of_buffer);
