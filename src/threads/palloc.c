@@ -42,6 +42,8 @@ static bool page_from_pool (const struct pool *, void *page);
 
 // size of user pool
 size_t user_pool_size;
+uint8_t *user_base_addr;
+
 // 
 /* Initializes the page allocator.  At most USER_PAGE_LIMIT
    pages are put into the user pool. */
@@ -62,6 +64,7 @@ void palloc_init (size_t user_page_limit)
   init_pool (&user_pool, free_start + kernel_pages * PGSIZE, user_pages,
              "user pool");
   user_pool_size = user_pages;
+  user_base_addr = free_start + kernel_pages * PGSIZE;
 }
  
 

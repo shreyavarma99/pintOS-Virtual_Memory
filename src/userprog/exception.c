@@ -162,12 +162,13 @@ bool success = false;
      struct spt_entry *found = page_lookup(fault_addr, thread_current ());
      if (found)
      {
-         if (found->in_file)
-         {
-            success = spt_handle_file_fault(found);
-         } else {
-            // swap situation
-         }
+         // if (found->in_file)
+         // {
+         //    success = spt_handle_file_fault(found);
+         // } else {
+         //    // swap situation
+         // }
+         success = spt_handle_page_fault(found);
      }
      else 
      {

@@ -521,7 +521,7 @@ void buf_valid (const void *buffer, unsigned size)
   /* check byte on each page for validity */
   while (temporary_buffer < end_of_buffer)
     {
-      for (int j = 0; j < 4; j++) 
+      for (int j = 0; j < 1; j++) 
       {
         /* check all three conditions for that byte */
         if ((char *) temporary_buffer + j == NULL || !is_user_vaddr ((char *) temporary_buffer + j))
@@ -556,7 +556,7 @@ void buf_valid (const void *buffer, unsigned size)
       temporary_buffer += PGSIZE;
     }
   
-  for (int j = 0; j < 4; j++) 
+  for (int j = 0; j < 1; j++) 
       {
         /* check all three conditions for that byte */
         if ((char *) end_of_buffer + j == NULL || !is_user_vaddr ((char *) end_of_buffer + j))

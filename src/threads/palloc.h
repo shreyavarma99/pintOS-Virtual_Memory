@@ -2,6 +2,7 @@
 #define THREADS_PALLOC_H
 
 #include <stddef.h>
+#include <inttypes.h>
 
 /* How to allocate pages. */
 enum palloc_flags
@@ -18,5 +19,6 @@ void palloc_free_page (void *);
 void palloc_free_multiple (void *, size_t page_cnt);
 
 extern size_t user_pool_size;
+extern uint8_t *user_base_addr;
 
 #endif /* threads/palloc.h */

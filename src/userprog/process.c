@@ -501,6 +501,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
       entry->in_swap = false;
       entry->in_file = true;
       entry->vaddr = pg_round_down(upage);
+      entry->in_resident = false;
       entry->file = file;
       entry->offset = ofs; /* where in the file are we? */
       entry->zero_bytes = page_zero_bytes; /* number of bytes that are zeroed out */

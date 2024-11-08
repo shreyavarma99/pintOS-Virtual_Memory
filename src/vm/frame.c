@@ -42,6 +42,7 @@ void init_frame_table ()
 {
     lock_init(&frame_lock);
     frames = malloc (user_pool_size * sizeof(struct frame_table_entry));
+    clock = 1;
 }
 
 void *allocate_frame(enum palloc_flags flagies, void *upage)
@@ -51,7 +52,7 @@ void *allocate_frame(enum palloc_flags flagies, void *upage)
         { 
             lock_acquire(&frame_lock);
             // find correct index in frame table
-            uint8_t index = (*kpage - LOADER_PHYS_BASE) / PGSIZE;
+            uint8_t index = (kpage - user_base_addr) / PGSIZE;
             // set up frame
             frames[index].paddr = kpage;
             frames[index].owner = thread_current ();  
@@ -62,32 +63,23 @@ void *allocate_frame(enum palloc_flags flagies, void *upage)
         } 
     else 
         {
-            PANIC("no more frames");
             // // eviction
-            // struct frame_table_entry *frame_to_replace = evict_frame();
-            // struct spt_entry *page_from_swap = page_lookup(pg_round_down(upage), thread_current());
-            // if (page_from_swap && page_from_swap->swap_index != -1)
-            // {
-            //     // in swap
-            //     swap_out_of_disk(page_from_swap);
-            // } else if (page_from_swap->in_file) {
-            //     // from a file
-            //     off_t read_bytes = file_read_at(page_from_swap->file, frame_to_replace->paddr, 
-            //         page_from_swap->read_bytes, page_from_swap->offset);
-            //     memset(frame_to_replace->paddr + read_bytes, 0, PGSIZE - read_bytes);
-            // } else {
-            //     // zero page
-            //     memset(frame_to_replace->paddr, 0, PGSIZE);
-            // }     
-            // //PANIC("couldn't find a free frame");
-            //  return frame_to_replace->paddr;
+            struct frame_table_entry *frame_to_replace = evict_frame();
+            if (!lock_held_by_current_thread(&frame_lock))
+                lock_acquire(&frame_lock);
+            frame_to_replace->owner = thread_current ();  
+            frame_to_replace->in_use = true;
+            frame_to_replace->vaddr = upage;
+            lock_release(&frame_lock);
+            return frame_to_replace->paddr;
         }
 }
 
 void free_frame(void *kpage)
 {
     lock_acquire(&frame_lock);
-    uint8_t index = (*((uint8_t *) kpage) - LOADER_PHYS_BASE) / PGSIZE;
+    uint8_t index = (((uint8_t *) kpage) - user_base_addr) / PGSIZE;
+    palloc_free_page(kpage);
     frames[index].in_use = false;
     frames[index].vaddr = NULL;
     frames[index].owner = NULL;
@@ -97,11 +89,13 @@ void free_frame(void *kpage)
 
 struct frame_table_entry *evict_frame(void)
 {
+    if (!lock_held_by_current_thread(&frame_lock))
+        lock_acquire(&frame_lock);
     while(true)
     {
         // reached end of frame table
         if (clock >= user_pool_size) {
-            clock = 0;
+            clock = 1;
         }
         
         struct frame_table_entry *frame = &frames[clock];
@@ -114,16 +108,18 @@ struct frame_table_entry *evict_frame(void)
                     //frame was accessed
                     pagedir_set_accessed(owner->pagedir, frame->vaddr, false);
                 }
-                else{
+                else {
                     //frame was not accessed...evict frame
                     bool dirty = pagedir_is_dirty(owner->pagedir, frame->vaddr);
-                    pagedir_clear_page(owner->pagedir, frame->vaddr);
                     struct spt_entry *entry = page_lookup(frame->vaddr, owner);
                     entry->in_swap = true;
                     swap_into_disk(entry);
+                    pagedir_clear_page(owner->pagedir, frame->vaddr);
                     frame->in_use = false;
                     frame->owner = NULL;
                     frame->vaddr = NULL;
+                    clock++;
+                    lock_release(&frame_lock);
                     return frame;
                 }
             }

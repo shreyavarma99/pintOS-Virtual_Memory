@@ -7,6 +7,7 @@
 #include "frame.h"
 #include <string.h>
 #include <stdio.h>
+#include "userprog/syscall.h"
 
 struct hash *spt_init (void) {
     struct hash *spt = malloc(sizeof(struct hash));
@@ -80,7 +81,40 @@ struct spt_entry *page_lookup (const void *address, struct thread *owner)
     return e != NULL ? hash_entry(e, struct spt_entry, hash_elem) : NULL;
 }
 
-bool spt_handle_file_fault(struct spt_entry *entry){
+bool spt_handle_page_fault(struct spt_entry *entry)
+{
+    if (entry->in_file)
+    {
+        return spt_handle_file_fault(entry);
+    }
+    
+    void *kpage = allocate_frame(PAL_USER, entry->vaddr);
+     if (kpage == NULL) {
+        printf("Failed to allocate frame\n");
+        return false;
+    }
+        if (entry->swap_index != -1)
+        {
+            // in swap
+            swap_out_of_disk(entry);
+        } else {
+            // zero page
+            memset(kpage, 0, PGSIZE);
+        }
+
+        struct thread *t = entry->owner;
+        if (!(pagedir_get_page(t->pagedir, entry->vaddr) == NULL &&
+            pagedir_set_page(t->pagedir, entry->vaddr, kpage, entry->writable))) {
+                palloc_free_page(kpage);
+                printf("Failed to map page to address space\n");
+                return false;
+        }     
+        //PANIC("couldn't find a free frame");
+        return true;
+}
+
+bool spt_handle_file_fault(struct spt_entry *entry)
+{
  uint8_t *kpage = allocate_frame(PAL_USER, entry->vaddr);
     if (kpage == NULL) {
         printf("Failed to allocate frame\n");
@@ -88,11 +122,14 @@ bool spt_handle_file_fault(struct spt_entry *entry){
     }
     entry->in_resident = true;
 
+    lock_acquire(&file_mutex);
     if (file_read_at(entry->file, kpage, entry->read_bytes, entry->offset) != (int) entry->read_bytes) {
         palloc_free_page(kpage);
         printf("Failed to read file data into frame\n");
+        lock_release(&file_mutex);
         return false;
     }
+    lock_release(&file_mutex);
     memset(kpage + entry->read_bytes, 0, entry->zero_bytes);
 
     struct thread *t = entry->owner;
