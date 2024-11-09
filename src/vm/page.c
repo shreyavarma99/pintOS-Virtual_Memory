@@ -1,13 +1,14 @@
-#include "page.h"
+//#include "vm/page.h"
 #include "threads/malloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "userprog/pagedir.h"
 #include "filesys/file.h"
-#include "frame.h"
+#include "vm/frame.h"
 #include <string.h>
 #include <stdio.h>
 #include "userprog/syscall.h"
+#include "vm/swap.h"
 
 struct hash *spt_init (void) {
     struct hash *spt = malloc(sizeof(struct hash));
@@ -83,68 +84,100 @@ struct spt_entry *page_lookup (const void *address, struct thread *owner)
 
 bool spt_handle_page_fault(struct spt_entry *entry)
 {
+    // if (entry->vaddr == 0x824b000)
+    //     PANIC("%p + %d + %d", entry->vaddr, entry->in_file, clock);
     if (entry->in_file)
     {
         return spt_handle_file_fault(entry);
     }
-    
-    void *kpage = allocate_frame(PAL_USER, entry->vaddr);
-     if (kpage == NULL) {
-        printf("Failed to allocate frame\n");
+    //entry->pinned = true;
+    void *kpage = allocate_frame(entry->vaddr);
+    if (kpage == NULL) {
+         PANIC("Failed to allocate frame\n");
         return false;
     }
+    pin_frame(kpage);
         if (entry->swap_index != -1)
         {
+            // if(entry->vaddr ==   0xbffff000){
+            //     PANIC("helpppp + %d", entry->swap_index);
+            // }
+
             // in swap
-            swap_out_of_disk(entry);
+            
+            swap_out_of_disk(kpage, entry->swap_index);
+            entry->swap_index = -1;
+            entry->in_resident = true;
+            pagedir_set_dirty(entry->owner->pagedir, entry->vaddr, true);
         } else {
             // zero page
+            //pin_frame(kpage);
             memset(kpage, 0, PGSIZE);
+            //unpin_frame(kpage);
         }
-
+        
+        unpin_frame(kpage);
         struct thread *t = entry->owner;
+        bool dirty = pagedir_is_dirty(t->pagedir, entry->vaddr);
         if (!(pagedir_get_page(t->pagedir, entry->vaddr) == NULL &&
             pagedir_set_page(t->pagedir, entry->vaddr, kpage, entry->writable))) {
-                palloc_free_page(kpage);
-                printf("Failed to map page to address space\n");
+                free_frame(kpage);
+                PANIC("Failed to map page to address space\n");
                 return false;
-        }     
+        }
+        pagedir_set_dirty(t->pagedir, entry->vaddr, dirty); 
         //PANIC("couldn't find a free frame");
+        //entry->pinned = false;
         return true;
 }
 
 bool spt_handle_file_fault(struct spt_entry *entry)
 {
- uint8_t *kpage = allocate_frame(PAL_USER, entry->vaddr);
+    uint8_t *kpage = allocate_frame(entry->vaddr);
+    pin_frame(kpage);
+
     if (kpage == NULL) {
-        printf("Failed to allocate frame\n");
+        PANIC("Failed to allocate frame\n");
         return false;
     }
-    entry->in_resident = true;
-
-    lock_acquire(&file_mutex);
-    if (file_read_at(entry->file, kpage, entry->read_bytes, entry->offset) != (int) entry->read_bytes) {
-        palloc_free_page(kpage);
-        printf("Failed to read file data into frame\n");
-        lock_release(&file_mutex);
-        return false;
-    }
-    lock_release(&file_mutex);
-    memset(kpage + entry->read_bytes, 0, entry->zero_bytes);
-
+    
     struct thread *t = entry->owner;
+    bool dirty = pagedir_is_dirty(t->pagedir, entry->vaddr);
+    if (dirty)
+    {
+        swap_out_of_disk(kpage, entry->swap_index);
+        entry->swap_index = -1;
+        entry->in_resident = true;
+        pagedir_set_dirty(entry->owner->pagedir, entry->vaddr, true);
+    }
+    else 
+    {
+        lock_acquire(&file_mutex);
+        if (file_read_at(entry->file, kpage, entry->read_bytes, entry->offset) != (int) entry->read_bytes) {
+            free_frame(kpage);
+            PANIC("Failed to read file data into frame\n");
+            lock_release(&file_mutex);
+            return false;
+        }
+        lock_release(&file_mutex);
+        memset(kpage + entry->read_bytes, 0, entry->zero_bytes);
+    }
+
     if (t == NULL || t->pagedir == NULL) {
-        palloc_free_page(kpage);
-        printf("Thread or page directory is NULL\n");
+        free_frame(kpage);
+        PANIC("Thread or page directory is NULL\n");
         return false;
     }
 
     if (!(pagedir_get_page(t->pagedir, entry->vaddr) == NULL &&
           pagedir_set_page(t->pagedir, entry->vaddr, kpage, entry->writable))) {
-        palloc_free_page(kpage);
-        printf("Failed to map page to address space\n");
+        free_frame(kpage);
+        PANIC("Failed to map page to address space\n");
         return false;
     }
+    pagedir_set_dirty(t->pagedir, entry->vaddr, dirty);  
+    unpin_frame(kpage);
+    entry->in_resident = true;
     return true;
 }
 

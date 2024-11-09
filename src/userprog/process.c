@@ -22,6 +22,7 @@
 #include "vm/page.h"
 #include "syscall.h"
 #include "threads/thread.h"
+#include "vm/frame.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -548,31 +549,36 @@ static bool setup_stack (void **esp)
 
   uint8_t *kpage;
   bool success = false;
+  // PANIC("made it here, %p", ((uint8_t *) PHYS_BASE) - PGSIZE);
+    struct spt_entry *stack_page = malloc(sizeof(struct spt_entry));
+    if (!stack_page) {
+      return false;
+    }
+    stack_page->owner = thread_current ();
+    stack_page->in_swap = true;
+    stack_page->in_file = false;
+    stack_page->swap_index = -1;
+    stack_page->in_resident = true;
+    stack_page->vaddr = ((uint8_t *) PHYS_BASE) - PGSIZE;
+    // PANIC("%p", ((uint8_t *) PHYS_BASE) - PGSIZE);
+    stack_page->writable = true;
 
-  // instead, frame.c should be returning the right page
-  // kpage = palloc_get_page (PAL_USER | PAL_ZERO);
-  kpage = (uint8_t *) allocate_frame (PAL_USER | PAL_ZERO, ((uint8_t *) PHYS_BASE) - PGSIZE);
-  // PANIC("done with alloc");
+  kpage = (uint8_t *) allocate_frame (((uint8_t *) PHYS_BASE) - PGSIZE);
+  // PANIC("made it here, %p", ((uint8_t *) PHYS_BASE) - PGSIZE);
   if (kpage != NULL)
     {
-      struct spt_entry *stack_page = malloc(sizeof(struct spt_entry));
-      if (!stack_page) {
-        return false;
-      }
-      stack_page->owner = thread_current ();
-      stack_page->in_swap = true;
-      stack_page->in_file = false;
-      stack_page->in_resident = true;
-      stack_page->vaddr = ((uint8_t *) PHYS_BASE) - PGSIZE;
-      stack_page->writable = true;
-      ASSERT(&(stack_page->hash_elem) != NULL);
-       if(!is_user_vaddr(stack_page->vaddr)){
-        PANIC("trying to add smtg that isn't user mem");
-    }
-      hash_insert(thread_current()->spt, &(stack_page->hash_elem));
+      pin_frame(kpage);
 
       success = install_page (stack_page->vaddr, kpage, true);
-      if (success){
+      pagedir_set_dirty(stack_page->owner->pagedir, stack_page->vaddr, true);
+
+      if (success)
+      {
+        // PANIC("got to insert");
+        hash_insert(thread_current()->spt, &(stack_page->hash_elem));
+        
+        // struct spt_entry = page_lookup(upage, thread_current());
+
         *esp = PHYS_BASE;
           
         int maxArgs = 128;
@@ -623,9 +629,11 @@ static bool setup_stack (void **esp)
         int fakeAddress = 0;
 
         memcpy (*esp, &fakeAddress, sizeof(int));
+        //unpin_frame(kpage);
     }
     else {
-        palloc_free_page (kpage);
+        free(stack_page);
+        free_frame(kpage);
     }
     }
 

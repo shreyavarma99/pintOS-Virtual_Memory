@@ -16,12 +16,12 @@ struct spt_entry {
     size_t zero_bytes; /* number of bytes that are zeroed out */
     size_t read_bytes; /* number of bytes that are read from file */
     struct hash_elem hash_elem;
-    uint8_t swap_index; /* swap slot this spt_entry is at if it in swap */
+    size_t swap_index; /* swap slot this spt_entry is at if it in swap */
     bool writable;
-    bool pinned;
 };
 
 struct hash *spt_init (void);
+void destroy_table(void);
 struct spt_entry *page_lookup (const void *address, struct thread *owner);
 hash_less_func suppl_hash_less;
 hash_hash_func suppl_hash_hash;

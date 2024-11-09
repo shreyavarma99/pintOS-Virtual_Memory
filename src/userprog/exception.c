@@ -8,6 +8,8 @@
 #include "threads/vaddr.h"
 #include "threads/malloc.h"
 #include "vm/frame.h"
+#include "userprog/pagedir.h"
+#include "userprog/syscall.h"
 
 #define MAXIMUM_STACK_SIZE 8388608
 
@@ -156,7 +158,7 @@ static void page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-bool success = false;
+   bool success = false;
   //fault_addr is null
   if (fault_addr != NULL && not_present && is_user_vaddr(fault_addr)) { //&& not present
      struct spt_entry *found = page_lookup(fault_addr, thread_current ());
@@ -178,8 +180,7 @@ bool success = false;
          success = grow_that_stack(fault_addr);
       }
       else{
-         //invalid stack growth
-         success = false;
+         // PANIC("exception 1, %p", fault_addr);
          exit(-1);
       }
      }
@@ -188,15 +189,20 @@ bool success = false;
        return;
      }
    } else {
+      // PANIC("exception 2 %p", fault_addr);
       exit (-1);
    }
 
-   kill (f);
+   if (!success)
+   // PANIC("kill");
+      kill (f);
 }
 
 bool grow_that_stack(void * fault_addr)
 {
    void *upage = pg_round_down(fault_addr);
+   if (upage == 0xbffff000)
+        PANIC("%p", upage);
 
    struct spt_entry *temp_entry = malloc(sizeof(struct spt_entry));
    
@@ -204,10 +210,13 @@ bool grow_that_stack(void * fault_addr)
    temp_entry->owner = thread_current();
    temp_entry->is_zero = true; // TO DO need stack enum?
    temp_entry->writable = true;
+   temp_entry->in_swap = true;
    temp_entry->vaddr = upage;
+   temp_entry->swap_index = -1;
+   temp_entry->in_file = false;
 
    // allocate the frame
-   uintptr_t *kpage = allocate_frame(PAL_USER, upage);
+   uintptr_t *kpage = allocate_frame(upage);
    if(!kpage){
       PANIC("couldn't allocate frame for stack growth :(");
       return false;
@@ -216,20 +225,18 @@ bool grow_that_stack(void * fault_addr)
    // add to spt
    if(!add_new_spt_entry(thread_current()->spt, temp_entry)){
       free(temp_entry);
-      //PANIC("couldn't add new entry to spt :(");
+      free_frame(kpage);
+      PANIC("couldn't add new entry to spt :(");
       return false;
    }
    
    // add to pagedir
+   bool dirty = pagedir_is_dirty(thread_current()->pagedir, upage);
    if(!pagedir_get_page (thread_current()->pagedir, upage) == NULL ||
           !pagedir_set_page (thread_current()->pagedir, temp_entry->vaddr, kpage, temp_entry->writable)){
+            free_frame(kpage);
+            free(temp_entry);
             return false;
    }
-
-          
-   //bool error = install_page (temp_entry->vaddr, kpage, temp_entry->writable);
-   // if(!error){
-   //    PANIC("couldn't add mapping to pagedir");
-   //    return false;
-   // }
+   pagedir_set_dirty(thread_current()->pagedir, upage, dirty);
 }

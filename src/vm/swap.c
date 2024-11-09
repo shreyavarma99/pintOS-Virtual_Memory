@@ -8,7 +8,7 @@
 #include "threads/thread.h"
 
 static struct bitmap *swap_partition;
-static struct lock lock;
+static struct lock swap_lock;
 struct block *swap;
 
 void swap_init (void)
@@ -17,11 +17,15 @@ void swap_init (void)
     if (!swap) {
         PANIC ("SWAP IS NULL");
     }
+    
     swap_partition = bitmap_create(block_size (swap) / 8);
+    lock_init(&swap_lock);
 }
 
 void swap_into_disk (struct spt_entry *entry)
 {
+    if (!lock_held_by_current_thread(&swap_lock))
+        lock_acquire(&swap_lock);
     entry->in_swap = true;
     entry->in_resident = false;
     size_t swap_index = bitmap_scan_and_flip(swap_partition, 0, 1, false);
@@ -35,23 +39,32 @@ void swap_into_disk (struct spt_entry *entry)
     for (int i = 0; i < 8; i++)
     {
         block_write(swap, swap_index * 8 + i, 
-                (char *) pagedir_get_page(entry->owner->pagedir, entry->vaddr) + i * 512);
+                (uint8_t *) entry->vaddr + (i * 512));
     }
-
+    if (lock_held_by_current_thread(&swap_lock))
+        lock_release(&swap_lock);
 }
 
-void swap_out_of_disk(struct spt_entry *entry)
+
+void swap_out_of_disk(uint8_t *kpage, size_t index)
 {
-    entry->in_swap = false;
-    entry->in_resident = true;
-    size_t swap_index = entry->swap_index;
+    if (!lock_held_by_current_thread(&swap_lock))
+        lock_acquire(&swap_lock);
+    //entry->in_swap = false;
+    // PANIC("tries to swap out of disk");
+    size_t swap_index = index;
     
+    bitmap_reset (swap_partition, swap_index);
+    // if(!is_user_vaddr(entry->vaddr) || entry->vaddr == NULL){
+    //     PANIC("boutta page fault");
+    // }
+    //PANIC("entry: %p", entry->vaddr);
     for (int i = 0; i < 8; i++)
     {
         block_read(swap, swap_index * 8 + i, 
-            (char *) pagedir_get_page(entry->owner->pagedir, entry->vaddr) + i * 512);
+            kpage + (i * 512));
     }
-    bitmap_reset (swap_partition, swap_index);
-    entry->swap_index = -1;
+    if (lock_held_by_current_thread(&swap_lock))
+        lock_release(&swap_lock);
 }
 

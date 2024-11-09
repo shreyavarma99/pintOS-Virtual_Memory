@@ -11,11 +11,19 @@ struct frame_table_entry {
     struct thread *owner;
     bool in_use;
     struct lock lock;
+    bool pinned;
 };
 
 void init_frame_table (void);
-void *allocate_frame(enum palloc_flags flagies, void *upage);
-void free_frame(void *kpage);
+uint8_t *allocate_frame(void *upage);
 struct frame_table_entry *evict_frame(void);
+void free_frame(void *kpage);
+extern size_t clock;
+void pin_frame(uint8_t *kpage);
+void unpin_frame(uint8_t *kpage);
+
+// void *allocate_frame(enum palloc_flags flagies, void *upage);
+// void free_frame(void *kpage);
+// struct frame_table_entry *evict_frame(void);
 
 

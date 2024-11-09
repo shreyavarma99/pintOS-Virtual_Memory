@@ -99,9 +99,7 @@ int main (void)
   palloc_init (user_page_limit);
   malloc_init ();
   paging_init ();
-  init_frame_table ();
   
-
   /* Segmentation. */
 #ifdef USERPROG
   tss_init ();
@@ -129,6 +127,7 @@ int main (void)
   locate_block_devices ();
   filesys_init (format_filesys);
 #endif
+  init_frame_table (); //TODO before?
   swap_init();
   printf ("Boot complete.\n");
 
