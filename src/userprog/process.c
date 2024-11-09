@@ -564,7 +564,7 @@ static bool setup_stack (void **esp)
     stack_page->writable = true;
 
   kpage = (uint8_t *) allocate_frame (((uint8_t *) PHYS_BASE) - PGSIZE);
-  // PANIC("made it here, %p", ((uint8_t *) PHYS_BASE) - PGSIZE);
+   //PANIC("made it here, %p", ((uint8_t *) PHYS_BASE) - PGSIZE);
   if (kpage != NULL)
     {
       pin_frame(kpage);
@@ -636,7 +636,7 @@ static bool setup_stack (void **esp)
         free_frame(kpage);
     }
     }
-
+  // PANIC("got here");
   return success;
 }
 

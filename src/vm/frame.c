@@ -41,6 +41,8 @@ uint8_t *allocate_frame(void *upage)
     {
         if(!frames[i].in_use)
         {
+           // PANIC("%p", upage);
+
             frames[i].in_use = true;
             frames[i].owner = thread_current ();  
             frames[i].vaddr = upage;
@@ -51,11 +53,13 @@ uint8_t *allocate_frame(void *upage)
     
     if (kpage != NULL)
     {
+        // PANIC("%p", upage);
+
         // pagedir set page
         lock_release(&frame_lock);
         return kpage;
     }
-    
+
     struct frame_table_entry *frame_to_replace = evict_frame();
 
     frame_to_replace->owner = thread_current ();  
@@ -116,7 +120,7 @@ struct frame_table_entry *evict_frame(void)
         }
         if (frames[clock].pinned)
         {
-            // PANIC("pinned we don't want to ");
+            //  PANIC("pinned we don't want to ");
             clock++;
             continue;
         }

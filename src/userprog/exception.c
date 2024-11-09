@@ -164,23 +164,30 @@ static void page_fault (struct intr_frame *f)
      struct spt_entry *found = page_lookup(fault_addr, thread_current ());
      if (found)
      {
-         // if (found->in_file)
-         // {
-         //    success = spt_handle_file_fault(found);
-         // } else {
-         //    // swap situation
-         // }
          success = spt_handle_page_fault(found);
+              // PANIC("went into here %d", success);
      }
      else 
      {
+      // if(fault_addr == 0xbfffee78 && is_user_vaddr(0xbfffee78)){
+      //    PANIC("came here and was user vaddr");
+      // }
       void *correct_esp = thread_current()->esp != NULL ? thread_current()->esp : f->esp;
       if (is_stack_growth(fault_addr, correct_esp))
       {
          success = grow_that_stack(fault_addr);
+         // if(fault_addr ==  0xbfffee78 && success == 0){
+         //    PANIC("failed to grow stack");
+         // }
+      //     if(fault_addr == 0xbfffee78 && is_user_vaddr(0xbfffee78)){
+      //    PANIC("came here and was user vaddr");
+      // }
+      //             PANIC("grew stack");
+
+
       }
       else{
-         // PANIC("exception 1, %p", fault_addr);
+         //  PANIC("exception 1, %p", fault_addr);
          exit(-1);
       }
      }
@@ -193,16 +200,23 @@ static void page_fault (struct intr_frame *f)
       exit (-1);
    }
 
-   if (!success)
-   // PANIC("kill");
+   if (!success){
+      // if(fault_addr == 0xbfffee78 && is_user_vaddr(fault_addr)){
+      //    PANIC("wasn't user vaddr");
+      // }
+      // PANIC("kill %p", fault_addr);
       kill (f);
+   }
+      
+     
 }
 
 bool grow_that_stack(void * fault_addr)
 {
    void *upage = pg_round_down(fault_addr);
-   if (upage == 0xbffff000)
-        PANIC("%p", upage);
+//   if(is_user_vaddr(upage)){
+//    PANIC("is user");
+//   }
 
    struct spt_entry *temp_entry = malloc(sizeof(struct spt_entry));
    
@@ -239,4 +253,9 @@ bool grow_that_stack(void * fault_addr)
             return false;
    }
    pagedir_set_dirty(thread_current()->pagedir, upage, dirty);
+   return true;
+   //  if(fault_addr == 0xbfffee78 && is_user_vaddr(upage)){
+   //       PANIC("came here and was user vaddr");
+   //    }
+   // PANIC("got here %p", fault_addr);
 }
