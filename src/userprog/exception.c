@@ -165,29 +165,17 @@ static void page_fault (struct intr_frame *f)
      if (found)
      {
          success = spt_handle_page_fault(found);
-              // PANIC("went into here %d", success);
      }
      else 
      {
-      // if(fault_addr == 0xbfffee78 && is_user_vaddr(0xbfffee78)){
-      //    PANIC("came here and was user vaddr");
-      // }
       void *correct_esp = thread_current()->esp != NULL ? thread_current()->esp : f->esp;
       if (is_stack_growth(fault_addr, correct_esp))
       {
          success = grow_that_stack(fault_addr);
-         // if(fault_addr ==  0xbfffee78 && success == 0){
-         //    PANIC("failed to grow stack");
-         // }
-      //     if(fault_addr == 0xbfffee78 && is_user_vaddr(0xbfffee78)){
-      //    PANIC("came here and was user vaddr");
-      // }
-      //             PANIC("grew stack");
-
 
       }
       else{
-         //  PANIC("exception 1, %p", fault_addr);
+         //PANIC("exception 1, %p", fault_addr);
          exit(-1);
       }
      }
@@ -196,15 +184,13 @@ static void page_fault (struct intr_frame *f)
        return;
      }
    } else {
-      // PANIC("exception 2 %p", fault_addr);
+      //PANIC("exception 2 %p", fault_addr);
       exit (-1);
    }
 
-   if (!success){
-      // if(fault_addr == 0xbfffee78 && is_user_vaddr(fault_addr)){
-      //    PANIC("wasn't user vaddr");
-      // }
-      // PANIC("kill %p", fault_addr);
+   if (!success)
+   {
+      //PANIC("kill %p", fault_addr);
       kill (f);
    }
       
@@ -254,8 +240,4 @@ bool grow_that_stack(void * fault_addr)
    }
    pagedir_set_dirty(thread_current()->pagedir, upage, dirty);
    return true;
-   //  if(fault_addr == 0xbfffee78 && is_user_vaddr(upage)){
-   //       PANIC("came here and was user vaddr");
-   //    }
-   // PANIC("got here %p", fault_addr);
 }

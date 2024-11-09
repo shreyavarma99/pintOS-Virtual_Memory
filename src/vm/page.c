@@ -96,7 +96,7 @@ bool spt_handle_page_fault(struct spt_entry *entry)
          PANIC("Failed to allocate frame\n");
         return false;
     }
-    pin_frame(kpage);
+    bool prev = pin_frame(kpage);
         if (entry->swap_index != -1)
         {
             // if(entry->vaddr ==   0xbffff000){
@@ -115,8 +115,8 @@ bool spt_handle_page_fault(struct spt_entry *entry)
             memset(kpage, 0, PGSIZE);
             //unpin_frame(kpage);
         }
-        
-        unpin_frame(kpage);
+        if (!prev)
+            unpin_frame(kpage);
         struct thread *t = entry->owner;
         bool dirty = pagedir_is_dirty(t->pagedir, entry->vaddr);
         if (!(pagedir_get_page(t->pagedir, entry->vaddr) == NULL &&
@@ -134,7 +134,7 @@ bool spt_handle_page_fault(struct spt_entry *entry)
 bool spt_handle_file_fault(struct spt_entry *entry)
 {
     uint8_t *kpage = allocate_frame(entry->vaddr);
-    pin_frame(kpage);
+    bool prev = pin_frame(kpage);
 
     if (kpage == NULL) {
         PANIC("Failed to allocate frame\n");
@@ -152,14 +152,17 @@ bool spt_handle_file_fault(struct spt_entry *entry)
     }
     else 
     {
-        lock_acquire(&file_mutex);
+        bool held = lock_held_by_current_thread(&file_mutex);
+        if (!held)
+            lock_acquire(&file_mutex);
         if (file_read_at(entry->file, kpage, entry->read_bytes, entry->offset) != (int) entry->read_bytes) {
             free_frame(kpage);
             PANIC("Failed to read file data into frame\n");
             lock_release(&file_mutex);
             return false;
         }
-        lock_release(&file_mutex);
+        if (!held)
+            lock_release(&file_mutex);
         memset(kpage + entry->read_bytes, 0, entry->zero_bytes);
     }
 
@@ -176,7 +179,8 @@ bool spt_handle_file_fault(struct spt_entry *entry)
         return false;
     }
     pagedir_set_dirty(t->pagedir, entry->vaddr, dirty);  
-    unpin_frame(kpage);
+    if (!prev)
+        unpin_frame(kpage);
     entry->in_resident = true;
     return true;
 }

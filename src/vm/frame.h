@@ -19,7 +19,7 @@ uint8_t *allocate_frame(void *upage);
 struct frame_table_entry *evict_frame(void);
 void free_frame(void *kpage);
 extern size_t clock;
-void pin_frame(uint8_t *kpage);
+bool pin_frame(uint8_t *kpage);
 void unpin_frame(uint8_t *kpage);
 
 // void *allocate_frame(enum palloc_flags flagies, void *upage);

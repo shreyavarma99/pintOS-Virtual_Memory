@@ -32,8 +32,19 @@ void init_frame_table ()
 
 uint8_t *allocate_frame(void *upage)
 {
-    if (!lock_held_by_current_thread(&frame_lock))
+    // if(lock_held_by_current_thread(&frame_lock)){
+    //     PANIC("lock held");
+    // }
+
+   
+    
+    bool held = lock_held_by_current_thread(&frame_lock);
+    if (!held)
+    {
+        // PANIC("lock already held by %d", thread_current()->tid);
         lock_acquire(&frame_lock);
+    }
+
     uint8_t *kpage = NULL;
     // search for free frame
     size_t i = 0;
@@ -41,8 +52,6 @@ uint8_t *allocate_frame(void *upage)
     {
         if(!frames[i].in_use)
         {
-           // PANIC("%p", upage);
-
             frames[i].in_use = true;
             frames[i].owner = thread_current ();  
             frames[i].vaddr = upage;
@@ -53,43 +62,49 @@ uint8_t *allocate_frame(void *upage)
     
     if (kpage != NULL)
     {
-        // PANIC("%p", upage);
-
         // pagedir set page
-        lock_release(&frame_lock);
+        if (!held)
+            lock_release(&frame_lock);
         return kpage;
     }
 
     struct frame_table_entry *frame_to_replace = evict_frame();
+
 
     frame_to_replace->owner = thread_current ();  
     frame_to_replace->in_use = true;
     frame_to_replace->vaddr = upage;
     kpage = frame_to_replace->paddr;
     struct spt_entry *spte = page_lookup(upage, frame_to_replace->owner);
-    lock_release(&frame_lock);
+    if (!held)
+        lock_release(&frame_lock);
     return kpage;
 }
 
-void pin_frame(uint8_t *kpage)
+bool pin_frame(uint8_t *kpage)
 {
-    if (!lock_held_by_current_thread(&frame_lock))
+    bool prev = false;
+    bool held = lock_held_by_current_thread(&frame_lock);
+    if (!held)
         lock_acquire(&frame_lock);
     for (size_t i = 0; i < user_pool_size - 1; i++)
     {
         if (frames[i].paddr == kpage)
         {
+            prev = frames[i].pinned;
             frames[i].pinned = true;
             break;
         }
     }
-    lock_release(&frame_lock);
-    return;
+    if (!held)
+        lock_release(&frame_lock);
+    return prev;
 }
 
 void unpin_frame(uint8_t *kpage)
 {
-    if (!lock_held_by_current_thread(&frame_lock))
+    bool held = lock_held_by_current_thread(&frame_lock);
+    if (!held)
         lock_acquire(&frame_lock);
     for (size_t i = 0; i < user_pool_size - 1; i++)
     {
@@ -99,12 +114,14 @@ void unpin_frame(uint8_t *kpage)
             break;
         }
     }
-    lock_release(&frame_lock);
+    if (!held)
+        lock_release(&frame_lock);
     return;
 }
 
 struct frame_table_entry *evict_frame(void)
 {
+
     struct frame_table_entry *evicted = NULL;
     while (evicted == NULL)
     {
@@ -133,14 +150,17 @@ struct frame_table_entry *evict_frame(void)
         }
         else 
         {
-            frames[clock].pinned = true;
+            //frames[clock].pinned = true;
            // PANIC("comes in here too");
             //frame was not accessed...evict frame
             bool dirty = pagedir_is_dirty(frames[clock].owner->pagedir, frames[clock].vaddr);
             struct spt_entry *entry = page_lookup(frames[clock].vaddr, frames[clock].owner);
+            // if(entry->vaddr == 0x80ea000){
+            //     PANIC("evicting our fav thingy");
+            // }
             if (dirty)
             {
-                swap_into_disk(entry);
+                swap_into_disk(entry, frames[clock].paddr);
             }
             entry->in_resident = false;
             entry->in_swap = true;
@@ -149,7 +169,7 @@ struct frame_table_entry *evict_frame(void)
             frames[clock].vaddr = NULL;
             evicted = &frames[clock];
             pagedir_clear_page(entry->owner->pagedir, entry->vaddr);
-            frames[clock].pinned = false;
+            //frames[clock].pinned = false;
             clock++;
             break;
         }
@@ -159,21 +179,21 @@ struct frame_table_entry *evict_frame(void)
 
 void free_frame(void *kpage)
 {
-    if (!lock_held_by_current_thread(&frame_lock))
+    bool held = lock_held_by_current_thread(&frame_lock);
+    if (!held)
         lock_acquire(&frame_lock);
     for (size_t i = 0; i < user_pool_size - 1; i++)
     {
         if (frames[i].paddr == kpage)
         {
-            lock_acquire(&frames[i].lock);
             pagedir_clear_page(frames[i].owner->pagedir, frames[i].vaddr);
             frames[i].in_use = false;
             frames[i].vaddr = NULL;
             frames[i].owner = NULL;
-            lock_release(&frames[i].lock);
             break;
         }
     }
-    lock_release(&frame_lock);
+    if (!held)
+        lock_release(&frame_lock);
     return;
 }

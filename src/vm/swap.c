@@ -22,7 +22,7 @@ void swap_init (void)
     lock_init(&swap_lock);
 }
 
-void swap_into_disk (struct spt_entry *entry)
+void swap_into_disk (struct spt_entry *entry, uint8_t *kpage)
 {
     if (!lock_held_by_current_thread(&swap_lock))
         lock_acquire(&swap_lock);
@@ -38,8 +38,9 @@ void swap_into_disk (struct spt_entry *entry)
 
     for (int i = 0; i < 8; i++)
     {
+        
         block_write(swap, swap_index * 8 + i, 
-                (uint8_t *) entry->vaddr + (i * 512));
+                kpage + (i * 512));
     }
     if (lock_held_by_current_thread(&swap_lock))
         lock_release(&swap_lock);
@@ -50,15 +51,11 @@ void swap_out_of_disk(uint8_t *kpage, size_t index)
 {
     if (!lock_held_by_current_thread(&swap_lock))
         lock_acquire(&swap_lock);
-    //entry->in_swap = false;
-    // PANIC("tries to swap out of disk");
+
     size_t swap_index = index;
     
     bitmap_reset (swap_partition, swap_index);
-    // if(!is_user_vaddr(entry->vaddr) || entry->vaddr == NULL){
-    //     PANIC("boutta page fault");
-    // }
-    //PANIC("entry: %p", entry->vaddr);
+
     for (int i = 0; i < 8; i++)
     {
         block_read(swap, swap_index * 8 + i, 

@@ -12,6 +12,7 @@
 #include "filesys/filesys.h"
 #include "vm/page.h"
 #include "userprog/exception.h"
+#include "vm/frame.h"
 
 static void syscall_handler (struct intr_frame *);
 void is_valid (void *uaddr);
@@ -343,12 +344,32 @@ int read (int fd, void *buffer, unsigned size)
         exit(-1);
       }
       lock_acquire (&file_mutex);
-      int result = file_read (current->files[fd], buffer, size);
-     // PANIC("finished read");
+      
+      int bytes_read = 0;
+      while (bytes_read < size) {
+          int to_read = PGSIZE;
+          
+          // If remaining bytes are less than a page, read only the remaining bytes
+          if ((size - bytes_read) < PGSIZE) {
+              to_read = size - bytes_read;
+          }
+
+          int read_now = file_read(current->files[fd], (char *) buffer + bytes_read, to_read);
+          
+          // If read_now is 0 or negative, it means EOF or error in read
+          if (read_now <= 0) {
+              break;
+          }
+
+          bytes_read += read_now;
+          unpin_frame(pagedir_get_page(thread_current()->pagedir, pg_round_down((char *) buffer + bytes_read)));
+      }
+
       lock_release (&file_mutex);
-      return result;
+      return bytes_read;
     }
 }
+
 
 
 /**
@@ -394,9 +415,27 @@ int write (int fd, const void *buffer, unsigned size)
       
       /* write to file atomically */
       lock_acquire (&file_mutex);
-      int written_b = file_write (current->files[fd], buffer, size);
+      int bytes_write = 0;
+      while (bytes_write < size) {
+          int to_write = PGSIZE;
+          
+          // If remaining bytes are less than a page, read only the remaining bytes
+          if ((size - bytes_write) < PGSIZE) {
+              to_write = size - bytes_write;
+          }
+
+          int write_now = file_write(current->files[fd], (char *) buffer + bytes_write, to_write);
+          
+          // If read_now is 0 or negative, it means EOF or error in read
+          if (write_now <= 0) {
+              break;
+          }
+
+          bytes_write += write_now;
+          unpin_frame(pagedir_get_page(thread_current()->pagedir, pg_round_down((char *) buffer + bytes_write)));
+      }
       lock_release (&file_mutex);
-      return written_b;
+      return bytes_write;
     }
 }
 
