@@ -341,6 +341,7 @@ int read (int fd, void *buffer, unsigned size)
       // void *buffer_page = pagedir_get_page(thread_current()->pgdir, buffer);
       struct spt_entry *buffer_spt_entry = page_lookup(buffer, thread_current());
       if(!buffer_spt_entry->writable){
+        //PANIC("exception 2");
         exit(-1);
       }
       lock_acquire (&file_mutex);
@@ -553,79 +554,85 @@ void is_valid (void *uaddr)
 void buf_valid (const void *buffer, unsigned size) 
 {
   /* Garv and Shreya V. driving */
-  char *temporary_buffer = (char *) buffer;
-  char *end_of_buffer = temporary_buffer + size - 1;
+  uint8_t *temporary_buffer = (uint8_t *) pg_round_down(buffer);
+  uint8_t *end_of_buffer = (uint8_t *) pg_round_down(temporary_buffer + size - 1);
   struct spt_entry *found;
 
   /* check byte on each page for validity */
-  while (temporary_buffer < end_of_buffer)
+  while (temporary_buffer <= end_of_buffer)
     {
       for (int j = 0; j < 1; j++) 
       {
         /* check all three conditions for that byte */
-        if ((char *) temporary_buffer + j == NULL || !is_user_vaddr ((char *) temporary_buffer + j))
+        if (temporary_buffer == NULL || !is_user_vaddr (temporary_buffer))
           {
             exit (-1);
           }
-        found = page_lookup(temporary_buffer + j, thread_current ());
+        found = page_lookup(temporary_buffer, thread_current ());
         if (found) {
           if (!found->in_resident)
           {
-            bool res = spt_handle_file_fault(found);
+            bool res = spt_handle_page_fault(found);
             if (!res)
             {
+              //PANIC("exception 3");
               exit(-1);
             }
           }
         } else {
           bool success = false;
           // if not loaded in as a page, page lookup 
-          if(temporary_buffer + j >= ((char *) thread_current()->esp - 32) && 
-              ((char *) PHYS_BASE - (char *) pg_round_down (temporary_buffer + j) <= MAXIMUM_STACK_SIZE)){
-                success = grow_that_stack(temporary_buffer + j);
+          if (temporary_buffer >= ((uint8_t *) thread_current()->esp - 32) && 
+              ((uint8_t *) PHYS_BASE - (uint8_t *) pg_round_down (temporary_buffer) <= MAXIMUM_STACK_SIZE)){
+                found = grow_that_stack(temporary_buffer);
           }
-          if (!success)
+          if (found == NULL)
           {
+            //PANIC("exception 4");
             exit(-1);
           }
         }
       }
-      // char val = *temporary_buffer;
-      // val = val + 1;
+      pin_frame(pagedir_get_page(found->owner->pagedir, found->vaddr));
       temporary_buffer += PGSIZE;
     }
   
   for (int j = 0; j < 1; j++) 
       {
         /* check all three conditions for that byte */
-        if ((char *) end_of_buffer + j == NULL || !is_user_vaddr ((char *) end_of_buffer + j))
+        if (end_of_buffer == NULL || !is_user_vaddr (end_of_buffer))
           {
             exit (-1);
           }
-        found = page_lookup(end_of_buffer + j, thread_current ());
+        found = page_lookup(end_of_buffer, thread_current ());
         if (found) {
           if (!found->in_resident)
           {
-            bool res = spt_handle_file_fault(found);
+            bool res = spt_handle_page_fault(found);
             if (!res)
             {
+              // PANIC("exception 6");
               exit(-1);
             }
           }
         } else {
           bool success = false;
           // if not loaded in as a page, page lookup 
-          if(temporary_buffer + j >= ((char *) thread_current()->esp - 32) && 
-              ((char *) PHYS_BASE - (char *) pg_round_down (temporary_buffer + j) <= MAXIMUM_STACK_SIZE)){
-                success = grow_that_stack(temporary_buffer + j);
+          if(end_of_buffer >= ((uint8_t *) thread_current()->esp - 32) && 
+              ((uint8_t *) PHYS_BASE - (uint8_t *) end_of_buffer <= MAXIMUM_STACK_SIZE)){
+                // PANIC("end_of_buffer: ");
+                found = grow_that_stack(end_of_buffer);
+          } else {
+            return;
           }
-          if (!success)
+          if (found == NULL)
           {
+            // PANIC("exception 5");
             exit(-1);
           }
         }
+        pin_frame(pagedir_get_page(found->owner->pagedir, found->vaddr));
       }
-  // is_valid((void *) end_of_buffer);
 }
 
 

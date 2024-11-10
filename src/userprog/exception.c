@@ -171,8 +171,13 @@ static void page_fault (struct intr_frame *f)
       void *correct_esp = thread_current()->esp != NULL ? thread_current()->esp : f->esp;
       if (is_stack_growth(fault_addr, correct_esp))
       {
-         success = grow_that_stack(fault_addr);
-
+         struct spt_entry *result = grow_that_stack(fault_addr);
+         if(result == NULL){
+            // PANIC("was null");
+            success = false;
+         } else{
+            success = true;
+         }
       }
       else{
          //PANIC("exception 1, %p", fault_addr);
@@ -193,18 +198,23 @@ static void page_fault (struct intr_frame *f)
       //PANIC("kill %p", fault_addr);
       kill (f);
    }
-      
-     
 }
 
-bool grow_that_stack(void * fault_addr)
+struct spt_entry *grow_that_stack(void * fault_addr)
 {
+   // PANIC("growth that stackkk");
    void *upage = pg_round_down(fault_addr);
-//   if(is_user_vaddr(upage)){
-//    PANIC("is user");
-//   }
+   struct spt_entry *temp_entry = page_lookup(upage, thread_current());
+   if (temp_entry)
+   {
+      if (temp_entry->swap_index != -1)
+      {
+         bool res = spt_handle_page_fault(temp_entry);
+      }
+      return temp_entry;
+   }
 
-   struct spt_entry *temp_entry = malloc(sizeof(struct spt_entry));
+   temp_entry = malloc(sizeof(struct spt_entry));
    
    temp_entry->in_resident = true;
    temp_entry->owner = thread_current();
@@ -219,7 +229,7 @@ bool grow_that_stack(void * fault_addr)
    uintptr_t *kpage = allocate_frame(upage);
    if(!kpage){
       PANIC("couldn't allocate frame for stack growth :(");
-      return false;
+      return NULL;
    }
 
    // add to spt
@@ -227,17 +237,18 @@ bool grow_that_stack(void * fault_addr)
       free(temp_entry);
       free_frame(kpage);
       PANIC("couldn't add new entry to spt :(");
-      return false;
+      return NULL;
    }
    
    // add to pagedir
    bool dirty = pagedir_is_dirty(thread_current()->pagedir, upage);
-   if(!pagedir_get_page (thread_current()->pagedir, upage) == NULL ||
+   if(pagedir_get_page (thread_current()->pagedir, upage) != NULL ||
           !pagedir_set_page (thread_current()->pagedir, temp_entry->vaddr, kpage, temp_entry->writable)){
             free_frame(kpage);
+            PANIC("returning null");
             free(temp_entry);
-            return false;
+            return NULL;
    }
    pagedir_set_dirty(thread_current()->pagedir, upage, dirty);
-   return true;
+   return temp_entry;
 }

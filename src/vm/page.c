@@ -93,21 +93,14 @@ bool spt_handle_page_fault(struct spt_entry *entry)
     //entry->pinned = true;
     void *kpage = allocate_frame(entry->vaddr);
     if (kpage == NULL) {
-         PANIC("Failed to allocate frame\n");
+        //  PANIC("Failed to allocate frame\n");
         return false;
     }
     bool prev = pin_frame(kpage);
         if (entry->swap_index != -1)
         {
-            // if(entry->vaddr ==   0xbffff000){
-            //     PANIC("helpppp + %d", entry->swap_index);
-            // }
-
-            // in swap
-            
             swap_out_of_disk(kpage, entry->swap_index);
             entry->swap_index = -1;
-            entry->in_resident = true;
             pagedir_set_dirty(entry->owner->pagedir, entry->vaddr, true);
         } else {
             // zero page
@@ -122,12 +115,14 @@ bool spt_handle_page_fault(struct spt_entry *entry)
         if (!(pagedir_get_page(t->pagedir, entry->vaddr) == NULL &&
             pagedir_set_page(t->pagedir, entry->vaddr, kpage, entry->writable))) {
                 free_frame(kpage);
-                PANIC("Failed to map page to address space\n");
+                // PANIC("Failed to map page to address space\n");
                 return false;
         }
         pagedir_set_dirty(t->pagedir, entry->vaddr, dirty); 
         //PANIC("couldn't find a free frame");
         //entry->pinned = false;
+        entry->swap_index = -1;
+        entry->in_resident = true;
         return true;
 }
 
@@ -137,7 +132,7 @@ bool spt_handle_file_fault(struct spt_entry *entry)
     bool prev = pin_frame(kpage);
 
     if (kpage == NULL) {
-        PANIC("Failed to allocate frame\n");
+        // PANIC("Failed to allocate frame\n");
         return false;
     }
     
@@ -157,7 +152,7 @@ bool spt_handle_file_fault(struct spt_entry *entry)
             lock_acquire(&file_mutex);
         if (file_read_at(entry->file, kpage, entry->read_bytes, entry->offset) != (int) entry->read_bytes) {
             free_frame(kpage);
-            PANIC("Failed to read file data into frame\n");
+            // PANIC("Failed to read file data into frame\n");
             lock_release(&file_mutex);
             return false;
         }
@@ -168,19 +163,20 @@ bool spt_handle_file_fault(struct spt_entry *entry)
 
     if (t == NULL || t->pagedir == NULL) {
         free_frame(kpage);
-        PANIC("Thread or page directory is NULL\n");
+        // PANIC("Thread or page directory is NULL\n");
         return false;
     }
 
     if (!(pagedir_get_page(t->pagedir, entry->vaddr) == NULL &&
           pagedir_set_page(t->pagedir, entry->vaddr, kpage, entry->writable))) {
         free_frame(kpage);
-        PANIC("Failed to map page to address space\n");
+        // PANIC("Failed to map page to address space\n");
         return false;
     }
     pagedir_set_dirty(t->pagedir, entry->vaddr, dirty);  
     if (!prev)
         unpin_frame(kpage);
+    entry->swap_index = -1;
     entry->in_resident = true;
     return true;
 }
@@ -189,7 +185,7 @@ bool spt_handle_file_fault(struct spt_entry *entry)
 bool add_new_spt_entry(struct hash *spt, struct spt_entry *new_entry)
 {
     if(!is_user_vaddr(new_entry->vaddr)){
-        PANIC("trying to add smtg that isn't user mem");
+        // PANIC("trying to add smtg that isn't user mem");
     }
     
     if(!hash_insert(spt, &new_entry->hash_elem)){
