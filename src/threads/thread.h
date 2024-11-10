@@ -1,6 +1,5 @@
 #ifndef THREADS_THREAD_H
 #define THREADS_THREAD_H
-
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
@@ -121,7 +120,7 @@ struct thread
   bool tid_error;
 #endif
 #ifdef VM
-   struct hash *spt;
+   struct hash *spt; /* supplemental page table */
    void *esp; /* stack pointer */
 #endif
 

@@ -49,6 +49,7 @@ uint8_t *user_base_addr;
    pages are put into the user pool. */
 void palloc_init (size_t user_page_limit)
 {
+  /* Garv, Jyotsna driving */
   /* Free memory starts at 1 MB and runs to the end of RAM. */
   uint8_t *free_start = ptov (1024 * 1024);
   uint8_t *free_end = ptov (init_ram_pages * PGSIZE);
@@ -63,6 +64,7 @@ void palloc_init (size_t user_page_limit)
   init_pool (&kernel_pool, free_start, kernel_pages, "kernel pool");
   init_pool (&user_pool, free_start + kernel_pages * PGSIZE, user_pages,
              "user pool");
+  /* set number of frame table entries */
   user_pool_size = user_pages;
   user_base_addr = free_start + kernel_pages * PGSIZE;
 }

@@ -127,8 +127,10 @@ int main (void)
   locate_block_devices ();
   filesys_init (format_filesys);
 #endif
-  init_frame_table (); //TODO before?
-  swap_init();
+  /* Initialize virtual memory system. */
+  /* Shreya Agrawal driving */
+  init_frame_table ();
+  swap_init ();
   printf ("Boot complete.\n");
 
   /* Run actions specified on kernel command line. */

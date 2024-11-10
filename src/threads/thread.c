@@ -173,6 +173,7 @@ tid_t thread_create (const char *name, int priority, thread_func *function,
 
   ASSERT (function != NULL);
 
+  /* Shreya Agrawal Driving */
   /* Allocate thread. */
   t = palloc_get_page (PAL_ZERO);
   if (t == NULL)
@@ -425,6 +426,7 @@ static bool is_thread (struct thread *t)
    NAME. */
 static void init_thread (struct thread *t, const char *name, int priority)
 {
+  /* Shreya Agrawal driving */
   enum intr_level old_level;
 
   ASSERT (t != NULL);
@@ -566,19 +568,20 @@ static tid_t allocate_tid (void)
  */
 struct thread *get_thread (tid_t tid)
 {
-  /* Jyotsna driving */ 
+  /* Jyotsna and Shreya Agrawal driving */ 
   struct list_elem *e;
   struct thread* result = NULL;
-  struct thread* t = thread_current();
-  for (e = list_begin (&t->children); e != list_end (&t->children); e = list_next (e))
-  {
-    struct thread *temp = list_entry (e, struct thread, child_elem);
-    if (temp->tid == tid)
+  struct thread* t = thread_current ();
+  for (e = list_begin (&t->children); e != 
+        list_end (&t->children); e = list_next (e))
     {
-      result = temp;
-      break;
+      struct thread *temp = list_entry (e, struct thread, child_elem);
+      if (temp->tid == tid)
+        {
+          result = temp;
+          break;
+        }
     }
-  }
   return result;
 }
 

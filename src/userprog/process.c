@@ -48,13 +48,12 @@ tid_t process_execute (const char *file_name)
   strlcpy (filename_copy, file_name, PGSIZE);
   executable = strtok_r (fn_copy, " ", &ptr);
 
-  /* Jyotsna, Garv, and Shreya V. driving */
+  /* Jyotsna, Garv, Shreya V., and Shreya Agrawal driving */
   
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (executable, PRI_DEFAULT, start_process, fn_copy);
   struct thread *child = get_thread (tid);
   tid = child->tid;
-  // printf("this is the child tid before sema: %i\n", tid);
   sema_down (&child->parent->exec_load);
 
   if (tid == TID_ERROR)
@@ -65,7 +64,6 @@ tid_t process_execute (const char *file_name)
     }
 
   /* make sure thread creation was successful */
-  // sema_down (&child->parent->exec_load);
   if (child == NULL) 
     {
       return TID_ERROR;
@@ -73,23 +71,10 @@ tid_t process_execute (const char *file_name)
   
   /* set parent of the child to current thread &
    wait until child has finished loading executable */
-  // child->parent = thread_current ();
-
-  // if (!child->loaded) 
-  //   {
-  //     /* unsuccessful load */
-  //     // PANIC("came into error case");
-  //     list_remove(&child->child_elem);
-  //     sema_up(&child->zombie);
-  //     return TID_ERROR;
-  //   }
-  // child->executable = file_to_execute;
-  //list_push_back (&child->parent->children, &child->child_elem);
-  // printf("%i", child->parent->tid);
   if (child->tid_error)
-  {
-    return TID_ERROR;
-  }
+    {
+      return TID_ERROR;
+    }
   return tid;
 }
 
@@ -113,13 +98,10 @@ static void start_process (void *file_name_)
   if (!success) 
     {
       /* unsuccessful load */
-      // PANIC("came into error case");
-      list_remove(&t->child_elem);
-      sema_up(&t->zombie);
+      list_remove (&t->child_elem);
+      sema_up (&t->zombie);
       t->tid = TID_ERROR;
       t->tid_error = true;
-      // printf("%i", t->tid);
-      // return TID_ERROR;
     }
 
   sema_up (&t->parent->exec_load);
@@ -158,21 +140,21 @@ int process_wait (tid_t child_tid)
   /* retrieve child of parent, NULL if it doesn't exist */
   for (e = list_begin (&current->children); 
         e != list_end (&current->children); e = list_next (e))
-  {
-    struct thread *temp = list_entry (e, struct thread, child_elem);
-    if (temp->tid == child_tid)
     {
-      child = temp;
-      break;
+      struct thread *temp = list_entry (e, struct thread, child_elem);
+      if (temp->tid == child_tid)
+        {
+          child = temp;
+          break;
+        }
     }
-  }
   
   /* check if tid is a child of parent */
   if (child == NULL || child->parent->tid != current->tid 
       || child->already_waited)
-  {
-    return -1;
-  }
+    {
+      return -1;
+    }
   /* child can go ahead and exit now */
   sema_up (&child->zombie);
   child->already_waited = true;
@@ -185,26 +167,29 @@ int process_wait (tid_t child_tid)
 /* Free the current process's resources. */
 void process_exit (void)
 {
+  /* Garv driving */
   struct thread *cur = thread_current ();
   uint32_t *pd;
   
-  destroy_table();
+  /* destroy spt, reclaim process resources */
+  destroy_table ();
+  
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
   if (pd != NULL)
-  {
-    /* Correct ordering here is crucial.  We must set
-        cur->pagedir to NULL before switching page directories,
-        so that a timer interrupt can't switch back to the
-        process page directory.  We must activate the base page
-        directory before destroying the process's page
-        directory, or our active page directory will be one
-        that's been freed (and cleared). */
-    cur->pagedir = NULL;
-    pagedir_activate (NULL);
-    pagedir_destroy (pd);
-  }
+    {
+      /* Correct ordering here is crucial.  We must set
+          cur->pagedir to NULL before switching page directories,
+          so that a timer interrupt can't switch back to the
+          process page directory.  We must activate the base page
+          directory before destroying the process's page
+          directory, or our active page directory will be one
+          that's been freed (and cleared). */
+      cur->pagedir = NULL;
+      pagedir_activate (NULL);
+      pagedir_destroy (pd);
+    }
 }
 
 /* Sets up the CPU for running user code in the current
@@ -297,7 +282,8 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
    Returns true if successful, false otherwise. */
 bool load (const char *file_name, void (**eip) (void), void **esp)
 {
-  lock_acquire(&file_mutex);
+  /* Jyotsna driving */
+  lock_acquire (&file_mutex);
   struct thread *t = thread_current ();
   struct Elf32_Ehdr ehdr;
   struct file *file = NULL;
@@ -311,11 +297,8 @@ bool load (const char *file_name, void (**eip) (void), void **esp)
     goto done;
   process_activate ();
   
-  thread_current()->spt = spt_init();
-  //PANIC("spt element count: %d", thread_current()->spt->elem_cnt);
-  if(thread_current()->spt == NULL){
-    PANIC("spt was null");
-  }
+  /* create supplemental page table */
+  thread_current ()->spt = spt_init ();
 
   file = filesys_open (executable);
 
@@ -326,7 +309,7 @@ bool load (const char *file_name, void (**eip) (void), void **esp)
     }
 
   t->executable = file;
-  file_deny_write(file);
+  file_deny_write (file);
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr ||
       memcmp (ehdr.e_ident, "\177ELF\1\1\1", 7) || ehdr.e_type != 2 ||
@@ -389,7 +372,6 @@ bool load (const char *file_name, void (**eip) (void), void **esp)
                   }
                 if (!load_segment (file, file_page, (void *) mem_page,
                                    read_bytes, zero_bytes, writable))
-                  
                   goto done;
               }
             else
@@ -407,13 +389,12 @@ bool load (const char *file_name, void (**eip) (void), void **esp)
   
   success = true;
 
-// PANIC("%d", success);
 done:
   /* Shreya V. and Jyotsna driving */
   /* track whether or not load was a success */
 
   /* set execute know we have loaded successfully */
-  lock_release(&file_mutex);
+  lock_release (&file_mutex);
   palloc_free_page (filename_copy);
   return success;
 }
@@ -488,6 +469,8 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
 
+  /* Jyotsna, and Shreya Varm Driving */
+
   file_seek (file, ofs);
   while (read_bytes > 0 || zero_bytes > 0)
     {
@@ -497,26 +480,22 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-      struct spt_entry *entry = malloc(sizeof(struct spt_entry));
-      entry->owner = thread_current();
+      /* create an spt entry and set its fields */
+      struct spt_entry *entry = malloc (sizeof(struct spt_entry));
+      entry->owner = thread_current ();
       entry->in_swap = false;
       entry->in_file = true;
-      entry->vaddr = pg_round_down(upage);
+      entry->vaddr = pg_round_down (upage);
       entry->in_resident = false;
       entry->file = file;
       entry->offset = ofs; /* where in the file are we? */
-      entry->zero_bytes = page_zero_bytes; /* number of bytes that are zeroed out */
-      entry->read_bytes = page_read_bytes; /* number of bytes that are read from file */
+      entry->zero_bytes = page_zero_bytes; /* bytes that are zeroed out */
+      entry->read_bytes = page_read_bytes; /* bytes that are read from file */
       entry->writable = writable;
 
-       if(!is_user_vaddr(entry->vaddr)){
-        PANIC("trying to add smtg that isn't user mem in load");
-    }
-      struct hash_elem *ret = hash_insert(thread_current()->spt, &entry->hash_elem);
-      if (ret == NULL) {
-        //PANIC("reinserting");
-      }
-      // PANIC("spt element count: %d", thread_current()->spt->elem_cnt);
+      /* insert spt entry into current thread's spt */
+      struct hash_elem *ret = hash_insert (thread_current ()->spt,
+                                           &entry->hash_elem);
 
       /* Advance. */
       read_bytes -= page_read_bytes;
@@ -549,95 +528,94 @@ static bool setup_stack (void **esp)
 
   uint8_t *kpage;
   bool success = false;
-  // PANIC("made it here, %p", ((uint8_t *) PHYS_BASE) - PGSIZE);
-    struct spt_entry *stack_page = malloc(sizeof(struct spt_entry));
-    if (!stack_page) {
+  struct spt_entry *stack_page = malloc (sizeof(struct spt_entry));
+  if (!stack_page) 
+    {
       return false;
     }
-    stack_page->owner = thread_current ();
-    stack_page->in_swap = true;
-    stack_page->in_file = false;
-    stack_page->swap_index = -1;
-    stack_page->in_resident = true;
-    stack_page->vaddr = ((uint8_t *) PHYS_BASE) - PGSIZE;
-    // PANIC("%p", ((uint8_t *) PHYS_BASE) - PGSIZE);
-    stack_page->writable = true;
-
+  /* set stack page's owner and other bits and metadata */
+  stack_page->owner = thread_current ();
+  stack_page->in_swap = true;
+  stack_page->in_file = false;
+  stack_page->swap_index = -1;
+  stack_page->in_resident = true;
+  stack_page->vaddr = ((uint8_t *) PHYS_BASE) - PGSIZE;
+  stack_page->writable = true;
+  
+  /* bring the stack page into physical memory */
   kpage = (uint8_t *) allocate_frame (((uint8_t *) PHYS_BASE) - PGSIZE);
 
-   //PANIC("made it here, %p", ((uint8_t *) PHYS_BASE) - PGSIZE);
   if (kpage != NULL)
     {
-      pin_frame(kpage);
+      /* pin stack page to make sure it doesn't get evicted */
+      pin_frame (kpage);
 
+      /* make sure it is in the page table and set dirty bits */
       success = install_page (stack_page->vaddr, kpage, true);
-      pagedir_set_dirty(stack_page->owner->pagedir, stack_page->vaddr, true);
+      pagedir_set_dirty (stack_page->owner->pagedir, stack_page->vaddr, true);
 
       if (success)
-      {
-        // PANIC("got to insert");
-        hash_insert(thread_current()->spt, &(stack_page->hash_elem));
-        
-        // struct spt_entry = page_lookup(upage, thread_current());
-
-        *esp = PHYS_BASE;
+        {
+          /* put spt entry in spt */
+          hash_insert (thread_current ()->spt, &(stack_page->hash_elem));
+          *esp = PHYS_BASE;
           
-        int maxArgs = 128;
-        char *arguments[maxArgs];
-        char *ptr;
-        char *argument = strtok_r ((char *) filename_copy, " ", &ptr);
-        int numArguments = 0;
+          int maxArgs = 128;
+          char *arguments[maxArgs];
+          char *ptr;
+          char *argument = strtok_r ((char *) filename_copy, " ", &ptr);
+          int numArguments = 0;
 
-        while (argument != NULL)
-          {
-            /* add argument values to stack */
-            *esp = (char *) *esp - (strlen (argument) + 1);
-            memcpy (*esp, argument, strlen (argument) + 1);
+          while (argument != NULL)
+            {
+              /* add argument values to stack */
+              *esp = (char *) *esp - (strlen (argument) + 1);
+              memcpy (*esp, argument, strlen (argument) + 1);
 
-            argument = strtok_r (NULL, " ", &ptr);
+              argument = strtok_r (NULL, " ", &ptr);
 
-            arguments[numArguments] = *esp;
-            numArguments++;
-          }
+              arguments[numArguments] = *esp;
+              numArguments++;
+            }
 
-        int currBytes = ((char *)PHYS_BASE - (char *)*esp);
-        int numBytesNeeded = currBytes % 4 == 0 ? 0 : (4 - currBytes % 4);
-        *esp = (char *) *esp - numBytesNeeded;
-        
-        /* add null sentinel */
-        *esp = (char *) *esp - sizeof(char *);
-        char *null_sentinel = NULL;
-        memcpy (*esp, &null_sentinel, sizeof(char *));
+          int currBytes = ((char *)PHYS_BASE - (char *)*esp);
+          int numBytesNeeded = currBytes % 4 == 0 ? 0 : (4 - currBytes % 4);
+          *esp = (char *) *esp - numBytesNeeded;
+          
+          /* add null sentinel */
+          *esp = (char *) *esp - sizeof (char *);
+          char *null_sentinel = NULL;
+          memcpy (*esp, &null_sentinel, sizeof (char *));
 
-        /* add argument pointers in reverse order */
-        for (int i = numArguments - 1; i >= 0; i--)
-          {
-            *esp = (char *) *esp - sizeof(char *);
-            memcpy (*esp, &arguments[i], sizeof(char *));
-          }
+          /* add argument pointers in reverse order */
+          for (int i = numArguments - 1; i >= 0; i--)
+            {
+              *esp = (char *) *esp - sizeof (char *);
+              memcpy (*esp, &arguments[i], sizeof (char *));
+            }
 
-        /* add pointer to array of arguments */
-        void* currESP = *esp;
-        *esp = (char *) *esp - sizeof(int);
-        memcpy (*esp, &currESP, sizeof(int));
+          /* add pointer to array of arguments */
+          void* currESP = *esp;
+          *esp = (char *) *esp - sizeof (int);
+          memcpy (*esp, &currESP, sizeof (int));
 
-        /* add argument count */
-        *esp = (char *) *esp - sizeof(int);
-        memcpy (*esp, &numArguments, sizeof(int));
+          /* add argument count */
+          *esp = (char *) *esp - sizeof (int);
+          memcpy (*esp, &numArguments, sizeof (int));
 
-        /* return fake dummy address */
-        *esp = (char *) *esp - sizeof(int);
-        int fakeAddress = 0;
+          /* return fake dummy address */
+          *esp = (char *) *esp - sizeof (int);
+          int fakeAddress = 0;
 
-        memcpy (*esp, &fakeAddress, sizeof(int));
-        //unpin_frame(kpage);
+          memcpy (*esp, &fakeAddress, sizeof (int));
+        }
+      else 
+        {
+          /* unsuccessful installation, free resources */
+          free (stack_page);
+          free_frame (kpage);
+        }
     }
-    else {
-        free(stack_page);
-        free_frame(kpage);
-    }
-    }
-  // PANIC("got here");
   return success;
 }
 

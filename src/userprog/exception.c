@@ -110,12 +110,20 @@ static void kill (struct intr_frame *f)
     }
 }
 
-bool is_stack_growth(void *fault_addr, void *esp) 
+/*
+   Check for stack growth, making sure the fault address is either 
+   above esp or within 32 below esp and the growth does not exceed 
+   the max stack size, returning true if so, and false otherwise.
+*/
+bool is_stack_growth (void *fault_addr, void *esp) 
 {
-   if(fault_addr >= ((char *) esp - 32) && ((char *) PHYS_BASE - (char *) pg_round_down (fault_addr) <= MAXIMUM_STACK_SIZE)){
-      return true;
-   }
-  return false;
+   /* Shreya Varma driving */
+   if (fault_addr >= ((char *) esp - 32) && ((char *) PHYS_BASE - 
+      (char *) pg_round_down (fault_addr) <= MAXIMUM_STACK_SIZE))
+      {
+         return true;
+      }
+   return false;
 }
 
 
@@ -158,97 +166,117 @@ static void page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-   bool success = false;
-  //fault_addr is null
-  if (fault_addr != NULL && not_present && is_user_vaddr(fault_addr)) { //&& not present
-     struct spt_entry *found = page_lookup(fault_addr, thread_current ());
-     if (found)
-     {
-         success = spt_handle_page_fault(found);
-     }
-     else 
-     {
-      void *correct_esp = thread_current()->esp != NULL ? thread_current()->esp : f->esp;
-      if (is_stack_growth(fault_addr, correct_esp))
-      {
-         struct spt_entry *result = grow_that_stack(fault_addr);
-         if(result == NULL){
-            // PANIC("was null");
-            success = false;
-         } else{
-            success = true;
+  bool success = false;
+
+  /* Jyotsna, and Shreya Varma Driving */
+  
+  /* handle page fault if the fault address is non-null, not present, 
+   and is a user virtual address */
+  if (fault_addr != NULL && not_present && is_user_vaddr (fault_addr)) 
+   {
+      struct spt_entry *found = page_lookup (fault_addr, thread_current ());
+      if (found)
+         {     /* in spt, see where we can bring in from to physical memory */
+               success = spt_handle_page_fault (found);
          }
-      }
-      else{
-         //PANIC("exception 1, %p", fault_addr);
-         exit(-1);
-      }
-     }
-     if (success)
-     {
-       return;
-     }
-   } else {
-      //PANIC("exception 2 %p", fault_addr);
+      else 
+         {
+            /* not in spt, could be stack growth, check for that and 
+            grow the stack if applicable */
+            void *correct_esp = thread_current ()->esp != NULL ? 
+                                 thread_current ()->esp : f->esp;
+            if (is_stack_growth (fault_addr, correct_esp))
+               {
+                  struct spt_entry *result = grow_that_stack (fault_addr);
+                  if (result == NULL)
+                     {
+                        success = false;
+                     } 
+                  else
+                     {
+                        success = true;
+                     }
+               }
+            else
+               {
+                  exit (-1);
+               }
+         }
+      if (success)
+         {
+            return;
+         }
+   } 
+  else 
+   {
       exit (-1);
    }
 
-   if (!success)
+  if (!success)
    {
-      //PANIC("kill %p", fault_addr);
       kill (f);
    }
 }
 
-struct spt_entry *grow_that_stack(void * fault_addr)
+/* Grows the stack if stack growth heuristic returns true,
+   see if it needs to be brought in for swap or needs a new spt entry, 
+   and allocate a frame for that entry, bringing it into physical memory
+*/
+struct spt_entry *grow_that_stack (void * fault_addr)
 {
-   // PANIC("growth that stackkk");
-   void *upage = pg_round_down(fault_addr);
-   struct spt_entry *temp_entry = page_lookup(upage, thread_current());
-   if (temp_entry)
-   {
-      if (temp_entry->swap_index != -1)
-      {
-         bool res = spt_handle_page_fault(temp_entry);
-      }
-      return temp_entry;
-   }
-
-   temp_entry = malloc(sizeof(struct spt_entry));
+   /* Shreya Varma, and Jyotsna driving */
+   void *upage = pg_round_down (fault_addr);
+   struct spt_entry *temp_entry = page_lookup (upage, thread_current());
    
+   /* already found in spt, see where located (see if in swap)*/
+   if (temp_entry)
+      {
+         if (temp_entry->swap_index != -1)
+            {
+               bool res = spt_handle_page_fault (temp_entry);
+            }
+         return temp_entry;
+      }
+
+   temp_entry = malloc (sizeof (struct spt_entry));
+
+   /* set fields of temp entry*/
    temp_entry->in_resident = true;
-   temp_entry->owner = thread_current();
-   temp_entry->is_zero = true; // TO DO need stack enum?
+   temp_entry->owner = thread_current ();
+   temp_entry->is_zero = true;
    temp_entry->writable = true;
    temp_entry->in_swap = true;
    temp_entry->vaddr = upage;
    temp_entry->swap_index = -1;
    temp_entry->in_file = false;
 
-   // allocate the frame
-   uintptr_t *kpage = allocate_frame(upage);
-   if(!kpage){
-      PANIC("couldn't allocate frame for stack growth :(");
-      return NULL;
-   }
+   /* allocate the frame */
+   uintptr_t *kpage = allocate_frame (upage);
+   if (!kpage)
+      {
+         PANIC("couldn't allocate frame for stack growth :(");
+         return NULL;
+      } 
 
-   // add to spt
-   if(!add_new_spt_entry(thread_current()->spt, temp_entry)){
-      free(temp_entry);
-      free_frame(kpage);
-      PANIC("couldn't add new entry to spt :(");
-      return NULL;
-   }
+   /* add to spt */
+   if (!add_new_spt_entry (thread_current ()->spt, temp_entry))
+      {
+         free (temp_entry);
+         free_frame (kpage);
+         return NULL;
+      }
    
-   // add to pagedir
-   bool dirty = pagedir_is_dirty(thread_current()->pagedir, upage);
-   if(pagedir_get_page (thread_current()->pagedir, upage) != NULL ||
-          !pagedir_set_page (thread_current()->pagedir, temp_entry->vaddr, kpage, temp_entry->writable)){
-            free_frame(kpage);
-            PANIC("returning null");
-            free(temp_entry);
-            return NULL;
-   }
-   pagedir_set_dirty(thread_current()->pagedir, upage, dirty);
+   /* add to pagedir */
+   bool dirty = pagedir_is_dirty (thread_current ()->pagedir, upage);
+   if (pagedir_get_page (thread_current ()->pagedir, upage) != NULL ||
+          !pagedir_set_page (thread_current ()->pagedir, temp_entry->vaddr, 
+         kpage, temp_entry->writable))
+      {
+         free_frame (kpage);
+         free(temp_entry);
+         return NULL;
+      }
+   /* set dirty bits */
+   pagedir_set_dirty (thread_current()->pagedir, upage, dirty);
    return temp_entry;
 }

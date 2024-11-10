@@ -9,5 +9,5 @@
 
 void exception_init (void);
 void exception_print_stats (void);
-struct spt_entry *grow_that_stack(void * fault_addr);
+struct spt_entry *grow_that_stack (void *fault_addr);
 #endif /* userprog/exception.h */

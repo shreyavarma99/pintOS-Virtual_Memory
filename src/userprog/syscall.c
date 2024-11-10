@@ -36,8 +36,9 @@ static void syscall_handler (struct intr_frame *f UNUSED)
 {
   /* Shreya Agrawal, Shreya Varma, Garv, Jyotsna driving */
 
+  /* save esp into thread */
+  thread_current ()->esp = f->esp;
   /* check all 4 bytes of the pointer */
-  thread_current()->esp = f->esp;
   is_valid ((char *) f->esp);
 
   /* get arguments */
@@ -104,7 +105,8 @@ static void syscall_handler (struct intr_frame *f UNUSED)
       default:
         break;
     }
-  thread_current()->esp = NULL;
+
+  thread_current ()->esp = NULL;
 }
 
 /**
@@ -132,7 +134,6 @@ void exit (int status)
   
   if (current->executable) 
     {
-      // file_allow_write (current->executable);
       file_close (current->executable);
     }
   lock_release (&file_mutex);
@@ -175,15 +176,12 @@ void exit (int status)
  */
 pid_t exec (const char *cmd_line)
 {
-  /* Garv and Shreya V. driving */
+  /* Garv, Shreya Agrawal, and Shreya V. driving */
   /* validate command line */
   string_valid (cmd_line);
 
-  // lock_acquire (&file_mutex);
   /* execute */
   tid_t result = process_execute (cmd_line);
-  // lock_release (&file_mutex);
-
   return result;
 }
 
@@ -240,7 +238,7 @@ bool remove (const char *file)
  */
 int open (const char* file)
 {
-  /* Shreya A., Jyotsna driving */
+  /* Shreya A., Shreya V., Jyotsna driving */
   string_valid (file);
 
   /* ensure open is atomic */
@@ -255,21 +253,21 @@ int open (const char* file)
       return -1;
     }
   if (current->current_fd == 127)
-  {
-    for (int i = 0; i < 128; i++)
     {
-      if (current->files[i] == NULL)
-      {
-        current->files[i] = currentFile;
-        return current->current_fd;
-      }
+      for (int i = 0; i < 128; i++)
+        {
+          if (current->files[i] == NULL)
+            {
+              current->files[i] = currentFile;
+              return current->current_fd;
+            }
+        }
     }
-  }
   else
-  {
+    {
     current->current_fd += 1;
     current->files[current->current_fd] = currentFile;
-  }
+    }
   return current->current_fd;
 }
 
@@ -338,33 +336,42 @@ int read (int fd, void *buffer, unsigned size)
   else 
     {
       /* read from file */
-      // void *buffer_page = pagedir_get_page(thread_current()->pgdir, buffer);
-      struct spt_entry *buffer_spt_entry = page_lookup(buffer, thread_current());
-      if(!buffer_spt_entry->writable){
-        //PANIC("exception 2");
-        exit(-1);
-      }
+      /* find buffer page in thread's spt */
+      struct spt_entry *buffer_spt_entry = page_lookup 
+        (buffer, thread_current());
+
+      if(!buffer_spt_entry->writable)
+        {
+          exit(-1);
+        }
       lock_acquire (&file_mutex);
       
       int bytes_read = 0;
-      while (bytes_read < size) {
+      while (bytes_read < size) 
+        {
           int to_read = PGSIZE;
           
-          // If remaining bytes are less than a page, read only the remaining bytes
-          if ((size - bytes_read) < PGSIZE) {
+          // If remaining bytes are less than a page, 
+            // read only the remaining bytes
+          if ((size - bytes_read) < PGSIZE) 
+            {
               to_read = size - bytes_read;
-          }
+            }
 
-          int read_now = file_read(current->files[fd], (char *) buffer + bytes_read, to_read);
+          int read_now = file_read (current->files[fd], 
+                                    (char *) buffer + bytes_read, to_read);
           
           // If read_now is 0 or negative, it means EOF or error in read
-          if (read_now <= 0) {
+          if (read_now <= 0) 
+            {
               break;
-          }
+            }
 
           bytes_read += read_now;
-          unpin_frame(pagedir_get_page(thread_current()->pagedir, pg_round_down((char *) buffer + bytes_read)));
-      }
+          /* done using the buffer page, can unpin */
+          unpin_frame (pagedir_get_page (thread_current ()->pagedir, 
+                      pg_round_down ((char *) buffer + bytes_read)));
+        }
 
       lock_release (&file_mutex);
       return bytes_read;
@@ -417,24 +424,31 @@ int write (int fd, const void *buffer, unsigned size)
       /* write to file atomically */
       lock_acquire (&file_mutex);
       int bytes_write = 0;
-      while (bytes_write < size) {
+      while (bytes_write < size) 
+        {
           int to_write = PGSIZE;
           
-          // If remaining bytes are less than a page, read only the remaining bytes
-          if ((size - bytes_write) < PGSIZE) {
+          /* If remaining bytes are less than a page, 
+            read only the remaining bytes */
+          if ((size - bytes_write) < PGSIZE) 
+            {
               to_write = size - bytes_write;
-          }
+            }
 
-          int write_now = file_write(current->files[fd], (char *) buffer + bytes_write, to_write);
+          int write_now = file_write (current->files[fd], 
+                          (char *) buffer + bytes_write, to_write);
           
           // If read_now is 0 or negative, it means EOF or error in read
-          if (write_now <= 0) {
+          if (write_now <= 0) 
+            {
               break;
-          }
+            }
 
           bytes_write += write_now;
-          unpin_frame(pagedir_get_page(thread_current()->pagedir, pg_round_down((char *) buffer + bytes_write)));
-      }
+          /* unpin now that we don't need this buffer page */
+          unpin_frame (pagedir_get_page(thread_current ()->pagedir, 
+                      pg_round_down ((char *) buffer + bytes_write)));
+        }
       lock_release (&file_mutex);
       return bytes_write;
     }
@@ -538,101 +552,114 @@ void is_valid (void *uaddr)
   for (int j = 0; j < 4; j++) 
     {
       /* check all three conditions for that byte */
-      if ((char *) uaddr + j == NULL || !is_user_vaddr ((char *) uaddr + j) || !pagedir_get_page (thread_current ()->pagedir, (char *) uaddr + j))
+      if ((char *) uaddr + j == NULL || !is_user_vaddr ((char *) uaddr + j) 
+        || !pagedir_get_page (thread_current ()->pagedir, (char *) uaddr + j))
         {
           exit (-1);
         }
     }
 }
 
-// /**
-//  * Check if a buffer contains valid addresses
-//  * Takes in the buffer and the size we want to check
-//  * and checks if the buffer is valid by iterating by PGSIZE 
-//  */
+/**
+ * Check if a buffer contains valid addresses
+ * Takes in the buffer and the size we want to check
+ * and checks if the buffer is valid by iterating by PGSIZE 
+ */
 
 void buf_valid (const void *buffer, unsigned size) 
 {
-  /* Garv and Shreya V. driving */
-  uint8_t *temporary_buffer = (uint8_t *) pg_round_down(buffer);
-  uint8_t *end_of_buffer = (uint8_t *) pg_round_down(temporary_buffer + size - 1);
+  /* Garv, Jyotsna, Shreya Agrawal, and Shreya V. driving */
+  uint8_t *temporary_buffer = (uint8_t *) pg_round_down (buffer);
+  uint8_t *end_of_buffer = (uint8_t *) 
+                            pg_round_down (temporary_buffer + size - 1);
   struct spt_entry *found;
 
   /* check byte on each page for validity */
   while (temporary_buffer <= end_of_buffer)
     {
       for (int j = 0; j < 1; j++) 
-      {
+        {
         /* check all three conditions for that byte */
-        if (temporary_buffer == NULL || !is_user_vaddr (temporary_buffer))
-          {
-            exit (-1);
-          }
-        found = page_lookup(temporary_buffer, thread_current ());
-        if (found) {
-          if (!found->in_resident)
-          {
-            bool res = spt_handle_page_fault(found);
-            if (!res)
+          if (temporary_buffer == NULL || !is_user_vaddr (temporary_buffer))
             {
-              //PANIC("exception 3");
-              exit(-1);
+              exit (-1);
             }
-          }
-        } else {
-          bool success = false;
-          // if not loaded in as a page, page lookup 
-          if (temporary_buffer >= ((uint8_t *) thread_current()->esp - 32) && 
-              ((uint8_t *) PHYS_BASE - (uint8_t *) pg_round_down (temporary_buffer) <= MAXIMUM_STACK_SIZE)){
-                found = grow_that_stack(temporary_buffer);
-          }
-          if (found == NULL)
-          {
-            //PANIC("exception 4");
-            exit(-1);
-          }
+          found = page_lookup (temporary_buffer, thread_current ());
+          if (found) 
+            {
+              if (!found->in_resident)
+                {
+                  /* bring into spt */
+                  bool res = spt_handle_page_fault (found);
+                  if (!res)
+                  {
+                    exit (-1);
+                  }
+                }
+            } 
+          else 
+            {
+              bool success = false;
+              // check for stack growth using heuristic
+              if (temporary_buffer >= ((uint8_t *) thread_current ()->esp - 32) 
+                  && ((uint8_t *) PHYS_BASE - (uint8_t *) 
+                  pg_round_down (temporary_buffer) <= MAXIMUM_STACK_SIZE))
+                {
+                  found = grow_that_stack (temporary_buffer);
+                }
+              if (found == NULL)
+                {
+                  exit (-1);
+                }
+            }
         }
-      }
-      pin_frame(pagedir_get_page(found->owner->pagedir, found->vaddr));
+      /* pin frame so it doesn't get evicted */
+      pin_frame (pagedir_get_page (found->owner->pagedir, found->vaddr));
       temporary_buffer += PGSIZE;
     }
   
   for (int j = 0; j < 1; j++) 
-      {
-        /* check all three conditions for that byte */
-        if (end_of_buffer == NULL || !is_user_vaddr (end_of_buffer))
-          {
-            exit (-1);
-          }
-        found = page_lookup(end_of_buffer, thread_current ());
-        if (found) {
-          if (!found->in_resident)
-          {
-            bool res = spt_handle_page_fault(found);
-            if (!res)
-            {
-              // PANIC("exception 6");
-              exit(-1);
-            }
-          }
-        } else {
-          bool success = false;
-          // if not loaded in as a page, page lookup 
-          if(end_of_buffer >= ((uint8_t *) thread_current()->esp - 32) && 
-              ((uint8_t *) PHYS_BASE - (uint8_t *) end_of_buffer <= MAXIMUM_STACK_SIZE)){
-                // PANIC("end_of_buffer: ");
-                found = grow_that_stack(end_of_buffer);
-          } else {
-            return;
-          }
-          if (found == NULL)
-          {
-            // PANIC("exception 5");
-            exit(-1);
-          }
+    {
+      /* check all three conditions for that byte */
+      if (end_of_buffer == NULL || !is_user_vaddr (end_of_buffer))
+        {
+          exit (-1);
         }
-        pin_frame(pagedir_get_page(found->owner->pagedir, found->vaddr));
-      }
+      found = page_lookup (end_of_buffer, thread_current ());
+      if (found) 
+        {
+          if (!found->in_resident)
+            {
+              /* bring into spt */
+              bool res = spt_handle_page_fault (found);
+              if (!res)
+                {
+                  exit (-1);
+                }
+            }
+        } 
+      else 
+        {
+          bool success = false;
+          // check for stack growth using heuristic
+          if (end_of_buffer >= ((uint8_t *) thread_current ()->esp - 32) && 
+            ((uint8_t *) PHYS_BASE - 
+            (uint8_t *) end_of_buffer <= MAXIMUM_STACK_SIZE))
+            {
+              found = grow_that_stack (end_of_buffer);
+            } 
+          else 
+            {
+              return;
+            }
+          if (found == NULL)
+            {
+              exit (-1);
+           }
+        }
+      /* pin frame to prevent eviction */
+      pin_frame (pagedir_get_page(found->owner->pagedir, found->vaddr));
+    }
 }
 
 
@@ -641,6 +668,7 @@ void buf_valid (const void *buffer, unsigned size)
  */
 void string_valid (const char* str)
 {
+  /* Shreya Varma driving */
     if (str == NULL)
       {
         exit (-1);
