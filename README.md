@@ -1,4 +1,5 @@
 **Implemented Features**
+
 1️⃣ Supplemental Page Table (SPT)
 
 Tracks virtual-to-physical memory mappings for user processes.
