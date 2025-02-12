@@ -1,11 +1,14 @@
 **Implemented Features**
 1️⃣ Supplemental Page Table (SPT)
+
 Tracks virtual-to-physical memory mappings for user processes.
 Supports multiple types of pages (stack, executable, mmap files).
 Provides efficient lookup and eviction mechanisms.
+
 2️⃣ Demand Paging
 Lazy loading of pages → Loads memory pages only when accessed, instead of loading everything at once.
 Handles page faults by fetching the required page from disk or swap when needed.
+
 3️⃣ Page Swapping
 Implements a swap table to store pages that don’t fit in physical memory.
 Uses disk-backed swapping when RAM is full.
