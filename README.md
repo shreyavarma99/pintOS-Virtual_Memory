@@ -32,12 +32,18 @@ Supports writing changes back to disk when unmapping.
 - Managing swap space efficiently → Ensuring minimal disk I/O for performance optimization.
 
 **How to Run**
+
 cd pintos/src/userprog
+
 make clean
+
 make
+
 pintos --qemu -- -q run your-program
 
+
 **For testing virtual memory:**
+
 pintos --qemu --swap-size=4 -- -q run test-virtual-memory
 
 
